@@ -1,6 +1,6 @@
 # working-cars-maze
 
-はたらくくるまが好きな 3 歳児向けの迷路アプリ（仮題: もぐらの つちのなか めいろ）。もぐらが建設車両（ショベルカー、ブルドーザー、ドリル車など）に乗り、土の中の迷路を進む。好きな車を選び、指でなぞって迷路を進む。スマホと iPad のブラウザで遊べるよう、Vite + TypeScript（UI フレームワークなし、描画は Canvas、入力は Pointer Events）で静的に出力し、GitHub Pages（`https://aew2sbee.github.io/working-cars-maze/`）で公開する。
+はたらくくるまが好きな 3 歳児向けの迷路アプリ「もぐら けんせつ めいろ」。もぐらが建設車両（ショベルカー、ブルドーザー、ドリル車など）に乗り、土の中の迷路を進む。好きな車を選び、指でなぞって迷路を進む。スマホと iPad のブラウザで遊べるよう、Vite + TypeScript（UI フレームワークなし、描画は Canvas、入力は Pointer Events）で静的に出力し、GitHub Pages（`https://aew2sbee.github.io/working-cars-maze/`）で公開する。
 
 ## 守ること
 
