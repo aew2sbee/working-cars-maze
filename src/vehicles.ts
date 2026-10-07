@@ -6,10 +6,10 @@ import { HAT, INK } from './draw';
 export type VehicleId = 'crane' | 'excavator' | 'bulldozer' | 'dump';
 
 export const VEHICLES: { id: VehicleId; name: string }[] = [
-  { id: 'crane', name: 'クレーンしゃ' },
-  { id: 'excavator', name: 'ショベルカー' },
-  { id: 'bulldozer', name: 'ブルドーザー' },
-  { id: 'dump', name: 'ダンプトラック' },
+  { id: 'crane', name: 'くれーんしゃ' },
+  { id: 'excavator', name: 'しょべるかー' },
+  { id: 'bulldozer', name: 'ぶるどーざー' },
+  { id: 'dump', name: 'だんぷとらっく' },
 ];
 
 const BODY = '#f6b818';

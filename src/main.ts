@@ -9,7 +9,7 @@ document.addEventListener('contextmenu', (event) => event.preventDefault());
 if (isPreview) {
   const badge = document.createElement('div');
   badge.className = 'preview-badge';
-  badge.textContent = 'プレビュー';
+  badge.textContent = 'ぷれびゅー';
   document.body.append(badge);
 }
 
