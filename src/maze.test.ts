@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { E, findPath, generateMaze, isOpen, neighbors, S, sameCell } from './maze';
+import { distancesFrom, E, findPath, generateMaze, isOpen, neighbors, pickGoal, S, sameCell } from './maze';
 import { mulberry32 } from './random';
 
 const sizes: [number, number][] = [
@@ -39,6 +39,30 @@ describe('generateMaze', () => {
         }
       }
     }
+  });
+});
+
+describe('pickGoal', () => {
+  it.each(sizes)('%i x %i puts the goal at a far dead end, not the start', (cols, rows) => {
+    const start = { col: 0, row: 0 };
+    const goals = new Set<string>();
+    for (let seed = 1; seed <= 30; seed++) {
+      const maze = generateMaze(cols, rows, mulberry32(seed));
+      const goal = pickGoal(maze, start, mulberry32(seed + 1000));
+      const distance = distancesFrom(maze, start);
+      const deadEndSteps = [];
+      for (let i = 0; i < cols * rows; i++) {
+        const cell = { col: i % cols, row: Math.floor(i / cols) };
+        if (i !== 0 && neighbors(maze, cell).length === 1) deadEndSteps.push(distance[i]);
+      }
+
+      expect(sameCell(goal, start)).toBe(false);
+      expect(neighbors(maze, goal)).toHaveLength(1);
+      expect(distance[goal.row * cols + goal.col] * 2).toBeGreaterThanOrEqual(Math.max(...deadEndSteps));
+      goals.add(`${goal.col},${goal.row}`);
+    }
+    // Not always the same corner.
+    expect(goals.size).toBeGreaterThan(1);
   });
 });
 

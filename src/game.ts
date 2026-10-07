@@ -12,7 +12,7 @@ import {
   type Layout,
   type Particle,
 } from './draw';
-import { findPath, generateMaze, sameCell, type Cell, type Maze } from './maze';
+import { findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
 
 /** Driving speed in cells per second. */
 const SPEED = 4;
@@ -83,8 +83,8 @@ export function startGame({ canvas, overlay, againButton, safeArea }: Elements):
     const rows = Math.min(6, Math.max(3, Math.round(area.height / TARGET_CELL)));
     seed = Math.floor(Math.random() * 2 ** 32);
     maze = generateMaze(cols, rows);
-    goal = { col: cols - 1, row: rows - 1 };
     current = { col: 0, row: 0 };
+    goal = pickGoal(maze, current);
     position = { ...current };
     route = [];
     tracks = [];

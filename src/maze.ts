@@ -70,6 +70,45 @@ export function neighbors(maze: Maze, cell: Cell): Cell[] {
   }));
 }
 
+/** Number of steps along the tunnels from `from` to every cell, indexed like `open`. */
+export function distancesFrom(maze: Maze, from: Cell): Int32Array {
+  const distance = new Int32Array(maze.cols * maze.rows).fill(-1);
+  distance[from.row * maze.cols + from.col] = 0;
+  const queue = [from];
+  for (let i = 0; i < queue.length; i++) {
+    const cell = queue[i];
+    const here = distance[cell.row * maze.cols + cell.col];
+    for (const next of neighbors(maze, cell)) {
+      const index = next.row * maze.cols + next.col;
+      if (distance[index] < 0) {
+        distance[index] = here + 1;
+        queue.push(next);
+      }
+    }
+  }
+  return distance;
+}
+
+/**
+ * Picks a dead end for the treasure, so the goal is somewhere new each time.
+ * Only dead ends at least half as far as the farthest one count, so the way is never trivially short.
+ */
+export function pickGoal(maze: Maze, start: Cell, random: () => number = Math.random): Cell {
+  const distance = distancesFrom(maze, start);
+  const deadEnds: { cell: Cell; steps: number }[] = [];
+  for (let row = 0; row < maze.rows; row++) {
+    for (let col = 0; col < maze.cols; col++) {
+      const cell = { col, row };
+      if (!sameCell(cell, start) && neighbors(maze, cell).length === 1) {
+        deadEnds.push({ cell, steps: distance[row * maze.cols + col] });
+      }
+    }
+  }
+  const farthest = Math.max(...deadEnds.map((end) => end.steps));
+  const candidates = deadEnds.filter((end) => end.steps * 2 >= farthest);
+  return candidates[Math.floor(random() * candidates.length)].cell;
+}
+
 /** Shortest route through open sides, including both ends. */
 export function findPath(maze: Maze, from: Cell, to: Cell): Cell[] {
   const key = (cell: Cell): number => cell.row * maze.cols + cell.col;
