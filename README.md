@@ -1,6 +1,6 @@
 # working-cars-maze
 
-はたらくくるまが好きな子ども向けの、スマホ / iPad で遊べる迷路アプリです。
+もぐらが建設車両に乗って土の中の迷路を進む、はたらくくるまが好きな子ども向けの迷路アプリです。スマホ / iPad で遊べます。
 
 https://aew2sbee.github.io/working-cars-maze/
 
