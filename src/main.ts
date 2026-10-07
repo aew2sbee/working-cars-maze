@@ -15,7 +15,10 @@ if (isPreview) {
 
 startGame({
   canvas: document.querySelector<HTMLCanvasElement>('#stage')!,
+  selectScreen: document.querySelector<HTMLElement>('#select')!,
+  vehicleList: document.querySelector<HTMLElement>('#vehicles')!,
   overlay: document.querySelector<HTMLElement>('#clear')!,
   againButton: document.querySelector<HTMLButtonElement>('#again')!,
+  changeButton: document.querySelector<HTMLButtonElement>('#change')!,
   safeArea: document.querySelector<HTMLElement>('.safe-area')!,
 });

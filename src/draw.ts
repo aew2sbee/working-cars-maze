@@ -1,4 +1,4 @@
-// Canvas drawing: a picture-book cutaway of the ground, the tunnels, the digger and the treasure.
+// Canvas drawing: a picture-book cutaway of the ground, the tunnels and the treasure.
 
 import { E, isOpen, S, type Cell, type Maze } from './maze';
 import { mulberry32 } from './random';
@@ -27,12 +27,11 @@ export interface Particle {
 /** Tunnel width as a share of the cell; the rest is soil wall. */
 export const TUNNEL = 0.62;
 
-const INK = '#3a2213';
+export const INK = '#3a2213';
 const STRATA = ['#8a5a36', '#7a4d2d', '#6a4126', '#5b361f'];
 const TUNNEL_FLOOR = '#dcb283';
 const PEBBLES = ['#a4835f', '#4b2a17', '#b39272', '#5e3a22'];
-const HAT = '#ffd23f';
-const BODY = '#f6b818';
+export const HAT = '#ffd23f';
 
 export function cellCenter(layout: Layout, cell: { col: number; row: number }): { x: number; y: number } {
   return {
@@ -177,7 +176,7 @@ function drawWorm(ctx: CanvasRenderingContext2D, x: number, y: number, length: n
 }
 
 /** Tread marks along the tunnels already driven through. */
-export function drawTracks(ctx: CanvasRenderingContext2D, layout: Layout, segments: [Cell, Cell][]): void {
+export function drawTreadMarks(ctx: CanvasRenderingContext2D, layout: Layout, segments: [Cell, Cell][]): void {
   if (segments.length === 0) return;
   const path = new Path2D();
   for (const [from, to] of segments) {
@@ -192,124 +191,6 @@ export function drawTracks(ctx: CanvasRenderingContext2D, layout: Layout, segmen
   ctx.lineCap = 'butt';
   ctx.setLineDash([layout.cell * 0.06, layout.cell * 0.07]);
   ctx.stroke(path);
-  ctx.restore();
-}
-
-/** An excavator facing right (flipped for left), driven by a mole in a hard hat. */
-export function drawDigger(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, facing: 1 | -1, bob: number): void {
-  const u = size / 100;
-  ctx.save();
-  ctx.translate(x, y + bob);
-  ctx.scale(facing * u, u);
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = INK;
-
-  // Crawler tracks.
-  ctx.fillStyle = '#3b3b3b';
-  ctx.beginPath();
-  ctx.roundRect(-42, 12, 80, 24, 12);
-  ctx.fill();
-  for (const wheel of [-29, -4, 21]) {
-    ctx.fillStyle = '#9a9a9a';
-    ctx.beginPath();
-    ctx.arc(wheel, 24, 7.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#3b3b3b';
-    ctx.beginPath();
-    ctx.arc(wheel, 24, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Arm and bucket, reaching forward.
-  ctx.lineWidth = 15;
-  ctx.beginPath();
-  ctx.moveTo(14, -2);
-  ctx.lineTo(32, -30);
-  ctx.lineTo(46, -4);
-  ctx.stroke();
-  ctx.strokeStyle = BODY;
-  ctx.lineWidth = 9;
-  ctx.stroke();
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 3;
-  ctx.fillStyle = '#6a6a6a';
-  ctx.beginPath();
-  ctx.moveTo(38, -8);
-  ctx.lineTo(56, -8);
-  ctx.lineTo(54, 8);
-  ctx.lineTo(48, 4);
-  ctx.lineTo(44, 10);
-  ctx.lineTo(40, 6);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Body with a hazard stripe.
-  ctx.fillStyle = BODY;
-  ctx.beginPath();
-  ctx.roundRect(-38, -8, 58, 24, 6);
-  ctx.fill();
-  ctx.save();
-  ctx.clip();
-  ctx.fillStyle = INK;
-  for (let sx = -44; sx < 24; sx += 10) {
-    ctx.beginPath();
-    ctx.moveTo(sx, 16);
-    ctx.lineTo(sx + 5, 16);
-    ctx.lineTo(sx + 10, 9);
-    ctx.lineTo(sx + 5, 9);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(-38, -8, 58, 24, 6);
-  ctx.stroke();
-
-  // The mole.
-  ctx.fillStyle = '#6d4c3d';
-  ctx.beginPath();
-  ctx.arc(-14, -18, 17, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = '#f29bb0';
-  ctx.beginPath();
-  ctx.arc(4, -15, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(-10, -20);
-  ctx.quadraticCurveTo(-6, -24, -2, -20);
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(242, 155, 176, 0.6)';
-  ctx.beginPath();
-  ctx.arc(-9, -11, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#f29bb0';
-  ctx.lineWidth = 2;
-  for (const paw of [-6, 4]) {
-    ctx.beginPath();
-    ctx.ellipse(paw, -7, 4.5, 3.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Hard hat.
-  ctx.fillStyle = HAT;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(-14, -26, 15, Math.PI, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.roundRect(-33, -29, 38, 6, 3);
-  ctx.fill();
-  ctx.stroke();
-
   ctx.restore();
 }
 

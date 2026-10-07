@@ -1,22 +1,22 @@
-// One maze: drag a finger and the digger follows it along the tunnels to the treasure.
+// Pick a vehicle, then drag a finger and it follows along the tunnels to the treasure.
 
 import { playFanfare, playStep, unlockAudio } from './audio';
 import {
   cellCenter,
   drawBackground,
   drawChest,
-  drawDigger,
   drawHint,
   drawParticles,
-  drawTracks,
+  drawTreadMarks,
   type Layout,
   type Particle,
 } from './draw';
 import { findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
+import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
 /** Driving speed in cells per second. */
 const SPEED = 4;
-/** How many cells ahead of the digger a finger may be and still steer it. */
+/** How many cells ahead of the vehicle a finger may be and still steer it. */
 const MAX_REACH = 3;
 /** Comfortable cell size for a small finger, in CSS pixels. */
 const TARGET_CELL = 140;
@@ -25,17 +25,24 @@ const CONFETTI = ['#ffd23f', '#ff6fa8', '#5ad1ff', '#7be36a', '#ffffff'];
 
 interface Elements {
   canvas: HTMLCanvasElement;
+  selectScreen: HTMLElement;
+  vehicleList: HTMLElement;
   overlay: HTMLElement;
   againButton: HTMLButtonElement;
+  changeButton: HTMLButtonElement;
   safeArea: HTMLElement;
 }
 
-export function startGame({ canvas, overlay, againButton, safeArea }: Elements): void {
+type Phase = 'select' | 'play' | 'clear';
+
+export function startGame({ canvas, selectScreen, vehicleList, overlay, againButton, changeButton, safeArea }: Elements): void {
   const ctx = canvas.getContext('2d')!;
   const background = document.createElement('canvas');
   const backgroundCtx = background.getContext('2d')!;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
+  let phase: Phase = 'select';
+  let vehicle: VehicleId = 'excavator';
   let maze: Maze;
   let seed = 0;
   let layout: Layout;
@@ -47,7 +54,6 @@ export function startGame({ canvas, overlay, againButton, safeArea }: Elements):
   let tracks: [Cell, Cell][] = [];
   let moving = false;
   let hasMoved = false;
-  let cleared = false;
   let hintUntil = 0;
   let particles: Particle[] = [];
   let activePointer: number | null = null;
@@ -90,7 +96,7 @@ export function startGame({ canvas, overlay, againButton, safeArea }: Elements):
     tracks = [];
     facing = 1;
     hasMoved = false;
-    cleared = false;
+    phase = 'play';
     particles = [];
     clearTimeout(overlayTimer);
     overlay.hidden = true;
@@ -155,7 +161,7 @@ export function startGame({ canvas, overlay, againButton, safeArea }: Elements):
   }
 
   function celebrate(): void {
-    cleared = true;
+    phase = 'clear';
     route = [];
     activePointer = null;
     playFanfare();
@@ -209,26 +215,70 @@ export function startGame({ canvas, overlay, againButton, safeArea }: Elements):
 
   function render(time: number): void {
     ctx.drawImage(background, 0, 0, layout.width, layout.height);
-    drawTracks(ctx, layout, tracks);
+    drawTreadMarks(ctx, layout, tracks);
 
     const chest = cellCenter(layout, goal);
-    if (!cleared) drawChest(ctx, chest.x, chest.y, layout.cell * 0.6, time, false);
+    if (phase !== 'clear') drawChest(ctx, chest.x, chest.y, layout.cell * 0.6, time, false);
 
-    const digger = cellCenter(layout, position);
+    const driver = cellCenter(layout, position);
     const size = layout.cell * 0.78;
     const wiggle = time < hintUntil ? Math.sin(time * 30) * size * 0.04 : 0;
     const bob = moving ? Math.sin(time * 22) * size * 0.02 : 0;
-    if (!cleared && (!hasMoved || time < hintUntil)) drawHint(ctx, digger.x, digger.y, size * 0.6, time);
-    drawDigger(ctx, digger.x + wiggle, digger.y, size, facing, bob);
+    if (phase === 'play' && (!hasMoved || time < hintUntil)) drawHint(ctx, driver.x, driver.y, size * 0.6, time);
+    drawVehicle(ctx, vehicle, driver.x + wiggle, driver.y, size, facing, bob);
 
-    // Once found, the open chest pops up above the digger instead of hiding under it.
-    if (cleared) drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
+    // Once found, the open chest pops up above the vehicle instead of hiding under it.
+    if (phase === 'clear') drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
 
     drawParticles(ctx, particles);
   }
 
+  function showSelect(): void {
+    phase = 'select';
+    clearTimeout(overlayTimer);
+    overlay.hidden = true;
+    selectScreen.hidden = false;
+    drawVehiclePictures();
+    vehicleList.querySelector<HTMLButtonElement>(`[data-vehicle="${vehicle}"]`)?.focus();
+  }
+
+  /** Draws each choice's picture at the button's current size. */
+  function drawVehiclePictures(): void {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    for (const picture of vehicleList.querySelectorAll<HTMLCanvasElement>('canvas[data-vehicle]')) {
+      const width = picture.clientWidth;
+      const height = picture.clientHeight;
+      picture.width = Math.round(width * dpr);
+      picture.height = Math.round(height * dpr);
+      const pictureCtx = picture.getContext('2d')!;
+      pictureCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const size = Math.min(width, height * 1.1) * 0.82;
+      drawVehicle(pictureCtx, picture.dataset.vehicle as VehicleId, width / 2, height * 0.56, size, 1, 0);
+    }
+  }
+
+  for (const { id, name } of VEHICLES) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'vehicle';
+    button.dataset.vehicle = id;
+    const picture = document.createElement('canvas');
+    picture.dataset.vehicle = id;
+    picture.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.textContent = name;
+    button.append(picture, label);
+    button.addEventListener('click', () => {
+      unlockAudio();
+      vehicle = id;
+      selectScreen.hidden = true;
+      newMaze();
+    });
+    vehicleList.append(button);
+  }
+
   canvas.addEventListener('pointerdown', (event) => {
-    if (cleared) return;
+    if (phase !== 'play') return;
     unlockAudio();
     activePointer = event.pointerId;
     canvas.setPointerCapture(event.pointerId);
@@ -236,7 +286,7 @@ export function startGame({ canvas, overlay, againButton, safeArea }: Elements):
     if (!steer(event)) hintUntil = performance.now() / 1000 + 0.8;
   });
   canvas.addEventListener('pointermove', (event) => {
-    if (event.pointerId === activePointer && !cleared) steer(event);
+    if (event.pointerId === activePointer && phase === 'play') steer(event);
   });
   const release = (event: PointerEvent): void => {
     if (event.pointerId === activePointer) activePointer = null;
@@ -248,7 +298,11 @@ export function startGame({ canvas, overlay, againButton, safeArea }: Elements):
     unlockAudio();
     newMaze();
   });
-  window.addEventListener('resize', resize);
+  changeButton.addEventListener('click', showSelect);
+  window.addEventListener('resize', () => {
+    resize();
+    if (phase === 'select') drawVehiclePictures();
+  });
 
   if (import.meta.env.DEV) {
     // Lets automated checks drive a finger along the solution; not in production builds.
@@ -257,7 +311,9 @@ export function startGame({ canvas, overlay, againButton, safeArea }: Elements):
     });
   }
 
+  // A maze sits behind the select screen so the canvas always has something to draw.
   newMaze();
+  showSelect();
   let last = performance.now();
   const frame = (now: number): void => {
     update(Math.min((now - last) / 1000, 0.05));

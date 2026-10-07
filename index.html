@@ -8,8 +8,13 @@
     <title>もぐら けんせつ めいろ</title>
   </head>
   <body>
-    <canvas id="stage" aria-label="もぐら けんせつ めいろ。ショベルカーを ゆびで なぞって たからばこまで すすもう"></canvas>
+    <canvas id="stage" aria-label="もぐら けんせつ めいろ。のりものを ゆびで なぞって たからばこまで すすもう"></canvas>
     <div class="safe-area" aria-hidden="true"></div>
+    <section id="select" class="select" aria-labelledby="select-title">
+      <h1 id="select-title" class="select__title">もぐら けんせつ めいろ</h1>
+      <p class="select__prompt">どれに のる？</p>
+      <div id="vehicles" class="select__list"></div>
+    </section>
     <div id="clear" class="clear" hidden>
       <p class="clear__title">やったね！</p>
       <button id="again" class="again" type="button">
@@ -19,6 +24,7 @@
         </svg>
         もういっかい
       </button>
+      <button id="change" class="change" type="button">のりものを えらぶ</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
