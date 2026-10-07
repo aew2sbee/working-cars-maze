@@ -21,4 +21,14 @@ startGame({
   againButton: document.querySelector<HTMLButtonElement>('#again')!,
   changeButton: document.querySelector<HTMLButtonElement>('#change')!,
   safeArea: document.querySelector<HTMLElement>('.safe-area')!,
+  lock: {
+    screen: document.querySelector<HTMLElement>('#lock')!,
+    adultButton: document.querySelector<HTMLButtonElement>('#adult')!,
+    gate: document.querySelector<HTMLElement>('#gate')!,
+    question: document.querySelector<HTMLElement>('#gate-question')!,
+    answer: document.querySelector<HTMLOutputElement>('#gate-answer')!,
+    hint: document.querySelector<HTMLElement>('#gate-hint')!,
+    keys: document.querySelector<HTMLElement>('#gate-keys')!,
+    backButton: document.querySelector<HTMLButtonElement>('#gate-back')!,
+  },
 });
