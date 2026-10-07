@@ -26,6 +26,7 @@ export function drawVehicle(
   size: number,
   facing: 1 | -1,
   bob: number,
+  driver = true,
 ): void {
   const u = size / 100;
   ctx.save();
@@ -38,23 +39,23 @@ export function drawVehicle(
 
   switch (id) {
     case 'crane':
-      drawCrane(ctx);
+      drawCrane(ctx, driver);
       break;
     case 'excavator':
-      drawExcavator(ctx);
+      drawExcavator(ctx, driver);
       break;
     case 'bulldozer':
-      drawBulldozer(ctx);
+      drawBulldozer(ctx, driver);
       break;
     case 'dump':
-      drawDumpTruck(ctx);
+      drawDumpTruck(ctx, driver);
       break;
   }
 
   ctx.restore();
 }
 
-function drawExcavator(ctx: CanvasRenderingContext2D): void {
+function drawExcavator(ctx: CanvasRenderingContext2D, driver: boolean): void {
   drawCrawler(ctx);
   drawArm(ctx, [
     [14, -2],
@@ -63,11 +64,11 @@ function drawExcavator(ctx: CanvasRenderingContext2D): void {
   ]);
   drawBucket(ctx);
   drawBody(ctx, -38, -8, 58, 24);
-  drawMole(ctx, -14, -18);
-  drawPaws(ctx, [-6, 4], -7);
+  if (driver) drawMole(ctx, -14, -18);
+  if (driver) drawPaws(ctx, [-6, 4], -7);
 }
 
-function drawCrane(ctx: CanvasRenderingContext2D): void {
+function drawCrane(ctx: CanvasRenderingContext2D, driver: boolean): void {
   drawCrawler(ctx);
   // Lattice boom: two rails with cross braces.
   ctx.beginPath();
@@ -98,11 +99,11 @@ function drawCrane(ctx: CanvasRenderingContext2D): void {
   ctx.stroke();
   ctx.lineWidth = 3;
   drawBody(ctx, -38, -8, 58, 24);
-  drawMole(ctx, -14, -18);
-  drawPaws(ctx, [-6, 4], -7);
+  if (driver) drawMole(ctx, -14, -18);
+  if (driver) drawPaws(ctx, [-6, 4], -7);
 }
 
-function drawBulldozer(ctx: CanvasRenderingContext2D): void {
+function drawBulldozer(ctx: CanvasRenderingContext2D, driver: boolean): void {
   drawCrawler(ctx);
   // Push arm and the big blade in front.
   drawArm(ctx, [
@@ -134,11 +135,11 @@ function drawBulldozer(ctx: CanvasRenderingContext2D): void {
   ctx.beginPath();
   ctx.roundRect(4, -20, 6, 13, 2);
   ctx.fill();
-  drawMole(ctx, -16, -18);
-  drawPaws(ctx, [-8, 2], -7);
+  if (driver) drawMole(ctx, -16, -18);
+  if (driver) drawPaws(ctx, [-8, 2], -7);
 }
 
-function drawDumpTruck(ctx: CanvasRenderingContext2D): void {
+function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean): void {
   // Chassis.
   ctx.fillStyle = RUBBER;
   ctx.beginPath();
@@ -173,8 +174,8 @@ function drawDumpTruck(ctx: CanvasRenderingContext2D): void {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  drawMole(ctx, 22, -20);
-  drawPaws(ctx, [28, 38], -9);
+  if (driver) drawMole(ctx, 22, -20);
+  if (driver) drawPaws(ctx, [28, 38], -9);
   // Windshield frame in front of the mole.
   ctx.lineWidth = 4;
   ctx.beginPath();
@@ -305,6 +306,85 @@ function drawMole(ctx: CanvasRenderingContext2D, hx: number, hy: number, scale =
   ctx.roundRect(-19, -11, 38, 6, 3);
   ctx.fill();
   ctx.stroke();
+  ctx.restore();
+}
+
+/** The mole asleep under a blanket, head on a pillow, hard hat set down beside it. Faces left. */
+export function drawSleepingMole(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  const u = size / 100;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(u, u);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3;
+
+  ctx.fillStyle = '#fff8e6';
+  ctx.beginPath();
+  ctx.ellipse(-30, 24, 22, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = FUR;
+  ctx.beginPath();
+  ctx.ellipse(6, 14, 34, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Blanket over the body.
+  ctx.fillStyle = '#7bb6e8';
+  ctx.beginPath();
+  ctx.moveTo(-14, 32);
+  ctx.quadraticCurveTo(-16, 2, 10, 0);
+  ctx.quadraticCurveTo(40, 0, 44, 32);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = '#fff8e6';
+  ctx.lineWidth = 3;
+  for (const stripe of [4, 20]) {
+    ctx.beginPath();
+    ctx.moveTo(stripe, 4);
+    ctx.lineTo(stripe + 4, 30);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = INK;
+
+  ctx.fillStyle = FUR;
+  ctx.beginPath();
+  ctx.arc(-30, 6, 17, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = PINK;
+  ctx.beginPath();
+  ctx.arc(-48, 9, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Closed, sleepy eye.
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-40, 2);
+  ctx.quadraticCurveTo(-36, 6, -32, 2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(242, 155, 176, 0.6)';
+  ctx.beginPath();
+  ctx.arc(-37, 12, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hard hat resting on the floor.
+  ctx.fillStyle = HAT;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(64, 30, 14, Math.PI, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.roundRect(46, 27, 36, 6, 3);
+  ctx.fill();
+  ctx.stroke();
+
   ctx.restore();
 }
 

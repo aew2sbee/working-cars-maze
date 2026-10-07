@@ -1,6 +1,7 @@
 // Pick a vehicle, then drag a finger and it follows along the tunnels to the treasure.
 
 import { playFanfare, playStep, unlockAudio } from './audio';
+import { drawBedtime } from './bedtime';
 import {
   cellCenter,
   drawBackground,
@@ -11,7 +12,10 @@ import {
   type Layout,
   type Particle,
 } from './draw';
+import { isPreview, storagePrefix } from './env';
+import { setupLockScreen } from './lock';
 import { chooseGrid, findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
+import { limitsFromQuery, loadPlayState, savePlayState, shouldLock, type PlayState } from './playtime';
 import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
 /** Driving speed in cells per second. */
@@ -29,11 +33,25 @@ interface Elements {
   againButton: HTMLButtonElement;
   changeButton: HTMLButtonElement;
   safeArea: HTMLElement;
+  lock: Parameters<typeof setupLockScreen>[0];
 }
 
-type Phase = 'select' | 'play' | 'clear';
+type Phase = 'select' | 'play' | 'clear' | 'locked';
 
-export function startGame({ canvas, selectScreen, vehicleList, overlay, againButton, changeButton, safeArea }: Elements): void {
+/** How often play time is counted, and how many counts between saves. */
+const TICK_MS = 1000;
+const SAVE_EVERY_TICKS = 5;
+
+export function startGame({
+  canvas,
+  selectScreen,
+  vehicleList,
+  overlay,
+  againButton,
+  changeButton,
+  safeArea,
+  lock: lockElements,
+}: Elements): void {
   const ctx = canvas.getContext('2d')!;
   const background = document.createElement('canvas');
   const backgroundCtx = background.getContext('2d')!;
@@ -180,6 +198,11 @@ export function startGame({ canvas, selectScreen, vehicleList, overlay, againBut
       });
     }
     overlayTimer = window.setTimeout(() => {
+      // Time is up: this was the last maze, so go to bed instead of offering another.
+      if (shouldLock(play.elapsedMs, false, limits)) {
+        lock();
+        return;
+      }
       overlay.hidden = false;
       againButton.focus();
     }, OVERLAY_DELAY_MS);
@@ -211,6 +234,10 @@ export function startGame({ canvas, selectScreen, vehicleList, overlay, againBut
   }
 
   function render(time: number): void {
+    if (phase === 'locked') {
+      drawBedtime(ctx, layout.width, layout.height, vehicle, time);
+      return;
+    }
     ctx.drawImage(background, 0, 0, layout.width, layout.height);
     drawTreadMarks(ctx, layout, tracks);
 
@@ -228,6 +255,56 @@ export function startGame({ canvas, selectScreen, vehicleList, overlay, againBut
     if (phase === 'clear') drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
 
     drawParticles(ctx, particles);
+  }
+
+  // Play time: counted only while the page is on screen, kept across reloads.
+  const storage = (() => {
+    try {
+      return window.localStorage;
+    } catch {
+      return undefined;
+    }
+  })();
+  const limits = limitsFromQuery(location.search, isPreview || import.meta.env.DEV);
+  let play: PlayState = loadPlayState(storage, storagePrefix);
+  let lastTick = performance.now();
+  let ticksSinceSave = 0;
+  const lockScreen = setupLockScreen(lockElements, unlock);
+
+  function save(): void {
+    ticksSinceSave = 0;
+    savePlayState(storage, storagePrefix, play);
+  }
+
+  function countPlayTime(): void {
+    const now = performance.now();
+    // Timers can stall (e.g. a sleeping device); never count a gap longer than a few ticks.
+    const delta = Math.min(now - lastTick, TICK_MS * 5);
+    lastTick = now;
+    if (document.hidden || phase === 'locked') return;
+    play.elapsedMs += delta;
+    if (++ticksSinceSave >= SAVE_EVERY_TICKS) save();
+    const inMaze = phase === 'play' || (phase === 'clear' && overlay.hidden === true);
+    if (shouldLock(play.elapsedMs, inMaze, limits)) lock();
+  }
+
+  function lock(): void {
+    phase = 'locked';
+    play.locked = true;
+    save();
+    route = [];
+    activePointer = null;
+    clearTimeout(overlayTimer);
+    overlay.hidden = true;
+    selectScreen.hidden = true;
+    lockScreen.show();
+  }
+
+  function unlock(): void {
+    play = { elapsedMs: 0, locked: false };
+    save();
+    lockScreen.hide();
+    showSelect();
   }
 
   function showSelect(): void {
@@ -304,13 +381,26 @@ export function startGame({ canvas, selectScreen, vehicleList, overlay, againBut
   if (import.meta.env.DEV) {
     // Lets automated checks drive a finger along the solution; not in production builds.
     Object.assign(window, {
-      __maze: { solution: () => findPath(maze, current, goal).map((cell) => cellCenter(layout, cell)) },
+      __maze: {
+        solution: () => findPath(maze, current, goal).map((cell) => cellCenter(layout, cell)),
+        phase: () => phase,
+        play: () => ({ ...play }),
+        setElapsed: (ms: number) => void (play.elapsedMs = ms),
+      },
     });
   }
 
+  window.setInterval(countPlayTime, TICK_MS);
+  document.addEventListener('visibilitychange', () => {
+    lastTick = performance.now();
+    if (document.hidden) save();
+  });
+  window.addEventListener('pagehide', save);
+
   // A maze sits behind the select screen so the canvas always has something to draw.
   newMaze();
-  showSelect();
+  if (play.locked || shouldLock(play.elapsedMs, false, limits)) lock();
+  else showSelect();
   let last = performance.now();
   const frame = (now: number): void => {
     update(Math.min((now - last) / 1000, 0.05));
