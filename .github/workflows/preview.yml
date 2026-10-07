@@ -1,0 +1,65 @@
+name: PR Preview
+
+# Build each pull request and publish it to gh-pages under pr-preview/pr-<number>/.
+# The preview URL is added to the PR description (and posted as a comment); the preview is removed when the PR is closed.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# One group per PR: a shared group keeps only one pending run, so a new preview
+# could cancel a queued production deploy or another PR's preview removal.
+# Concurrent pushes to gh-pages are retried by the deploy action.
+concurrency:
+  group: gh-pages-pr-${{ github.event.number }}
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    # Fork PRs get a read-only token, so they cannot publish a preview.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        if: github.event.action != 'closed'
+        with:
+          node-version: 22
+          cache: npm
+      - if: github.event.action != 'closed'
+        run: npm ci
+      - if: github.event.action != 'closed'
+        run: npm run build
+        env:
+          BASE_PATH: /working-cars-maze/pr-preview/pr-${{ github.event.number }}/
+          PUBLIC_DEPLOY_ENV: preview
+      - uses: rossjrw/pr-preview-action@v1.8.1
+        with:
+          source-dir: dist
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          action: ${{ github.event.action == 'closed' && 'remove' || 'deploy' }}
+          wait-for-pages-deployment: false
+      # Add the preview URL to the PR description once (the URL is stable per PR).
+      # It goes right after the "## 確認方法" section, or before the trailing
+      # "🤖 Generated" line / at the end when there is no such section.
+      - name: Add preview URL to PR description
+        if: github.event.action != 'closed'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+          URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-preview/pr-${{ github.event.number }}/
+        run: |
+          marker='<!-- pr-preview-url -->'
+          body=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json body -q .body)
+          if grep -qF "$marker" <<<"$body"; then exit 0; fi
+          printf '%s\n' "$body" | awk -v sec="$marker\n## 開発環境URL\n\n$URL\n" '
+            index($0, "## 確認方法") == 1 { in_check = 1; print; next }
+            !done && ((in_check && index($0, "## ") == 1) || index($0, "🤖") == 1) { print sec; done = 1 }
+            { print }
+            END { if (!done) print "\n" sec }
+          ' | gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --body-file -
