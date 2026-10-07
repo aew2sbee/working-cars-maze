@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#6fc3ea" />
     <link rel="icon" type="image/svg+xml" href="/working-cars-maze/favicon.svg" />
     <title>もぐら けんせつ めいろ</title>
-    <script type="module" crossorigin src="/working-cars-maze/assets/index-BPBWz67w.js"></script>
-    <link rel="stylesheet" crossorigin href="/working-cars-maze/assets/index-Bs0sR8rJ.css">
+    <script type="module" crossorigin src="/working-cars-maze/assets/index-nhz93V2V.js"></script>
+    <link rel="stylesheet" crossorigin href="/working-cars-maze/assets/index-C9U_noNq.css">
   </head>
   <body>
     <canvas id="stage" aria-label="もぐら けんせつ めいろ。のりものを ゆびで なぞって たからばこまで すすもう"></canvas>
@@ -28,5 +28,16 @@
       </button>
       <button id="change" class="change" type="button">のりものを えらぶ</button>
     </div>
+    <section id="lock" class="lock" aria-labelledby="lock-title" hidden>
+      <p id="lock-title" class="lock__title">またあしたね</p>
+      <button id="adult" class="lock__adult" type="button">おとなの ひと</button>
+      <div id="gate" class="gate" role="dialog" aria-modal="true" aria-labelledby="gate-lead" hidden>
+        <p id="gate-lead" class="gate__lead">おとなの ひとへ<br />こたえを いれると、また あそべます</p>
+        <p class="gate__question"><span id="gate-question"></span> = <output id="gate-answer" class="gate__answer"></output></p>
+        <p id="gate-hint" class="gate__hint" aria-live="polite"></p>
+        <div id="gate-keys" class="gate__keys"></div>
+        <button id="gate-back" class="gate__back" type="button">もどる</button>
+      </div>
+    </section>
   </body>
 </html>
