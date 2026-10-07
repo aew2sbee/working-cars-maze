@@ -1,19 +1,13 @@
----
-import { isPreview } from '../env';
-
-const base = import.meta.env.BASE_URL;
----
-
+<!doctype html>
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
-    {isPreview && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>はたらくくるま めいろ</title>
   </head>
   <body style="background:#fff8e1;color:#3e2723;font-family:sans-serif;padding:24px">
-    <h1>はたらくくるま めいろ</h1>
-    <p>じゅんびちゅう</p>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

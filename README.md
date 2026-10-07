@@ -8,7 +8,7 @@ https://aew2sbee.github.io/working-cars-maze/
 
 ```sh
 npm install
-npm run dev      # http://localhost:4321/working-cars-maze/
+npm run dev      # http://localhost:5173/working-cars-maze/
 npm run build
 ```
 
