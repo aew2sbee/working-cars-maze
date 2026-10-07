@@ -11,15 +11,13 @@ import {
   type Layout,
   type Particle,
 } from './draw';
-import { findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
+import { chooseGrid, findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
 import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
 /** Driving speed in cells per second. */
 const SPEED = 4;
 /** How many cells ahead of the vehicle a finger may be and still steer it. */
 const MAX_REACH = 3;
-/** Comfortable cell size for a small finger, in CSS pixels. */
-const TARGET_CELL = 140;
 const OVERLAY_DELAY_MS = 900;
 const CONFETTI = ['#ffd23f', '#ff6fa8', '#5ad1ff', '#7be36a', '#ffffff'];
 
@@ -85,8 +83,7 @@ export function startGame({ canvas, selectScreen, vehicleList, overlay, againBut
 
   function newMaze(): void {
     const area = playArea(canvas.clientWidth, canvas.clientHeight);
-    const cols = Math.min(7, Math.max(3, Math.round(area.width / TARGET_CELL)));
-    const rows = Math.min(6, Math.max(3, Math.round(area.height / TARGET_CELL)));
+    const { cols, rows } = chooseGrid(area.width, area.height);
     seed = Math.floor(Math.random() * 2 ** 32);
     maze = generateMaze(cols, rows);
     current = { col: 0, row: 0 };

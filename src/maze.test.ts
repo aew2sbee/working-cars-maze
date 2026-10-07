@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { distancesFrom, E, findPath, generateMaze, isOpen, neighbors, pickGoal, S, sameCell } from './maze';
+import { chooseGrid, distancesFrom, E, findPath, MIN_CELL, TARGET_CELLS, generateMaze, isOpen, neighbors, pickGoal, S, sameCell } from './maze';
 import { mulberry32 } from './random';
 
 const sizes: [number, number][] = [
@@ -63,6 +63,35 @@ describe('pickGoal', () => {
     }
     // Not always the same corner.
     expect(goals.size).toBeGreaterThan(1);
+  });
+});
+
+describe('chooseGrid', () => {
+  // Play areas (CSS px, below the grass and inside the safe area) of common screens.
+  it.each([
+    ['iPhone portrait', 358, 700],
+    ['iPhone landscape', 760, 270],
+    ['iPad portrait', 788, 1060],
+    ['iPad landscape', 1148, 704],
+    ['small Android portrait', 328, 600],
+  ])('%s gets cells big enough for a finger', (_, width, height) => {
+    const { cols, rows } = chooseGrid(width, height);
+    expect(Math.min(width / cols, height / rows)).toBeGreaterThanOrEqual(MIN_CELL);
+    expect(cols).toBeGreaterThanOrEqual(3);
+    expect(rows).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each([
+    ['iPhone portrait', 358, 700],
+    ['iPad portrait', 788, 1060],
+    ['iPad landscape', 1148, 704],
+  ])('%s gets about the same number of cells', (_, width, height) => {
+    const { cols, rows } = chooseGrid(width, height);
+    expect(Math.abs(cols * rows - TARGET_CELLS)).toBeLessThanOrEqual(4);
+  });
+
+  it('falls back to the smallest maze on a tiny screen', () => {
+    expect(chooseGrid(200, 200)).toEqual({ cols: 3, rows: 3 });
   });
 });
 

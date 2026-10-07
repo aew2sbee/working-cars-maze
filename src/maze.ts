@@ -24,6 +24,35 @@ const STEPS = [
   { bit: W, back: E, dc: -1, dr: 0 },
 ] as const;
 
+/** About how many cells a maze has, whatever the screen, so phones and tablets are equally hard. */
+export const TARGET_CELLS = 30;
+/** Smallest cell a small finger can still trace, in CSS pixels. */
+export const MIN_CELL = 80;
+const MAX_COLS = 8;
+const MAX_ROWS = 9;
+
+/**
+ * Picks columns and rows for the play area: as close to TARGET_CELLS as cells of at least
+ * MIN_CELL allow, preferring grids that fill the area without much empty space.
+ */
+export function chooseGrid(width: number, height: number): { cols: number; rows: number } {
+  let best = { cols: 3, rows: 3 };
+  let bestScore = Infinity;
+  for (let cols = 3; cols <= MAX_COLS; cols++) {
+    for (let rows = 3; rows <= MAX_ROWS; rows++) {
+      const cell = Math.min(width / cols, height / rows);
+      if (cell < MIN_CELL) continue;
+      const unused = 1 - (cols * rows * cell * cell) / (width * height);
+      const score = Math.abs(cols * rows - TARGET_CELLS) + unused * 10;
+      if (score < bestScore) {
+        bestScore = score;
+        best = { cols, rows };
+      }
+    }
+  }
+  return best;
+}
+
 export function sameCell(a: Cell, b: Cell): boolean {
   return a.col === b.col && a.row === b.row;
 }
