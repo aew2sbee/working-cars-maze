@@ -14,7 +14,7 @@ import {
 } from './draw';
 import { isPreview, storagePrefix } from './env';
 import { setupLockScreen } from './lock';
-import { chooseGrid, findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
+import { cellAtPoint, chooseGrid, findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
 import { limitsFromQuery, loadPlayState, savePlayState, shouldLock, type PlayState } from './playtime';
 import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
@@ -22,6 +22,8 @@ import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 const SPEED = 4;
 /** How many cells ahead of the vehicle a finger may be and still steer it. */
 const MAX_REACH = 3;
+/** How far, in cells, a finger must move past the edge of the cell it is on to pick another. */
+const SLACK = 0.3;
 const OVERLAY_DELAY_MS = 900;
 const CONFETTI = ['#ffd23f', '#ff6fa8', '#5ad1ff', '#7be36a', '#ffffff'];
 
@@ -72,7 +74,14 @@ export function startGame({
   let hasMoved = false;
   let hintUntil = 0;
   let particles: Particle[] = [];
+  /** The finger driving the vehicle; other touches (a palm, a second finger) are ignored. */
   let activePointer: number | null = null;
+  /** Until the driving finger first steers, another finger near the vehicle may take over. */
+  let activeHasSteered = false;
+  /** Fingers on the maze that are not driving, in case one should take over. */
+  const otherPointers = new Set<number>();
+  /** The cell the driving finger is on, kept while the finger stays near it. */
+  let fingerCell: Cell | null = null;
   let overlayTimer = 0;
 
   function insets(): { top: number; right: number; bottom: number; left: number } {
@@ -108,6 +117,7 @@ export function startGame({
     goal = pickGoal(maze, current);
     position = { ...current };
     route = [];
+    fingerCell = null;
     tracks = [];
     facing = 1;
     hasMoved = false;
@@ -141,25 +151,47 @@ export function startGame({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function cellAt(event: PointerEvent): Cell | null {
+  function cellAt(event: PointerEvent, keep: Cell | null): Cell | null {
     const rect = canvas.getBoundingClientRect();
-    const col = Math.floor((event.clientX - rect.left - layout.originX) / layout.cell);
-    const row = Math.floor((event.clientY - rect.top - layout.originY) / layout.cell);
-    if (col < 0 || row < 0 || col >= maze.cols || row >= maze.rows) return null;
-    return { col, row };
+    const x = (event.clientX - rect.left - layout.originX) / layout.cell;
+    const y = (event.clientY - rect.top - layout.originY) / layout.cell;
+    return cellAtPoint(maze, x, y, keep, SLACK);
   }
 
-  /** Plans a route to the touched cell when it is close enough along the tunnels. */
+  /** The touched cell when it is close enough along the tunnels to drive to. */
+  function reachableCell(event: PointerEvent, keep: Cell | null): Cell | null {
+    const cell = cellAt(event, keep);
+    if (!cell || findPath(maze, current, cell).length - 1 > MAX_REACH) return null;
+    return cell;
+  }
+
+  /** Plans a route to the driving finger's cell when it is close enough along the tunnels. */
   function steer(event: PointerEvent): boolean {
-    const target = cellAt(event);
+    const target = reachableCell(event, fingerCell);
     if (!target) return false;
+    fingerCell = target;
+    activeHasSteered = true;
     const path = findPath(maze, current, target);
-    if (path.length - 1 > MAX_REACH) return false;
     const heading = route[0];
     // Mid-way between cells, turning around means driving back to the last cell first.
     const turnsBack = heading && !(path[1] && sameCell(path[1], heading));
     route = turnsBack ? [current, ...path.slice(1)] : path.slice(1);
     return true;
+  }
+
+  function drive(event: PointerEvent): void {
+    if (activePointer !== null) otherPointers.add(activePointer);
+    otherPointers.delete(event.pointerId);
+    activePointer = event.pointerId;
+    activeHasSteered = false;
+    fingerCell = null;
+    steer(event);
+  }
+
+  function releasePointers(): void {
+    activePointer = null;
+    otherPointers.clear();
+    fingerCell = null;
   }
 
   function arrive(cell: Cell): void {
@@ -178,7 +210,7 @@ export function startGame({
   function celebrate(): void {
     phase = 'clear';
     route = [];
-    activePointer = null;
+    releasePointers();
     playFanfare();
     if (!reduceMotion.matches) {
       const { x, y } = cellCenter(layout, goal);
@@ -293,7 +325,7 @@ export function startGame({
     play.locked = true;
     save();
     route = [];
-    activePointer = null;
+    releasePointers();
     clearTimeout(overlayTimer);
     overlay.hidden = true;
     selectScreen.hidden = true;
@@ -351,19 +383,37 @@ export function startGame({
     vehicleList.append(button);
   }
 
+  /**
+   * A palm or another finger that lands first must not keep the real finger from driving:
+   * while the driving touch has not steered yet, a touch within reach takes over.
+   */
+  function takeOver(event: PointerEvent): boolean {
+    if (activeHasSteered || !reachableCell(event, null)) return false;
+    drive(event);
+    return true;
+  }
+
   canvas.addEventListener('pointerdown', (event) => {
     if (phase !== 'play') return;
     unlockAudio();
-    activePointer = event.pointerId;
     canvas.setPointerCapture(event.pointerId);
-    // A touch too far away gets a wiggle so the child knows where to start.
-    if (!steer(event)) hintUntil = performance.now() / 1000 + 0.8;
+    if (activePointer === null) {
+      drive(event);
+      // A touch too far away gets a wiggle so the child knows where to start.
+      if (!activeHasSteered) hintUntil = performance.now() / 1000 + 0.8;
+    } else if (!takeOver(event)) {
+      otherPointers.add(event.pointerId);
+    }
   });
   canvas.addEventListener('pointermove', (event) => {
-    if (event.pointerId === activePointer && phase === 'play') steer(event);
+    if (phase !== 'play') return;
+    if (event.pointerId === activePointer) steer(event);
+    else if (otherPointers.has(event.pointerId)) takeOver(event);
   });
   const release = (event: PointerEvent): void => {
-    if (event.pointerId === activePointer) activePointer = null;
+    // Touches left behind (say, a resting palm) wait for a new finger rather than taking over.
+    if (event.pointerId === activePointer) releasePointers();
+    else otherPointers.delete(event.pointerId);
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);

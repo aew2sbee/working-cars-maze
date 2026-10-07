@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseGrid, distancesFrom, E, findPath, MIN_CELL, TARGET_CELLS, generateMaze, isOpen, neighbors, pickGoal, S, sameCell } from './maze';
+import { cellAtPoint, chooseGrid, distancesFrom, E, findPath, MIN_CELL, TARGET_CELLS, generateMaze, isOpen, neighbors, pickGoal, S, sameCell } from './maze';
 import { mulberry32 } from './random';
 
 const sizes: [number, number][] = [
@@ -107,5 +107,25 @@ describe('findPath', () => {
   it('returns just the cell when start and goal match', () => {
     const maze = generateMaze(3, 3, mulberry32(1));
     expect(findPath(maze, { col: 1, row: 1 }, { col: 1, row: 1 })).toEqual([{ col: 1, row: 1 }]);
+  });
+});
+
+describe('cellAtPoint', () => {
+  const maze = generateMaze(4, 3, mulberry32(1));
+
+  it('picks the cell under the point', () => {
+    expect(cellAtPoint(maze, 2.5, 1.5, null, 0.3)).toEqual({ col: 2, row: 1 });
+  });
+
+  it('returns null off the grid', () => {
+    expect(cellAtPoint(maze, -0.1, 1, null, 0.3)).toBeNull();
+    expect(cellAtPoint(maze, 1, 3.2, null, 0.3)).toBeNull();
+  });
+
+  it('stays on the kept cell until the point is well past its edge', () => {
+    const keep = { col: 1, row: 1 };
+    expect(cellAtPoint(maze, 2.25, 1.5, keep, 0.3)).toBe(keep);
+    expect(cellAtPoint(maze, 1.5, 0.75, keep, 0.3)).toBe(keep);
+    expect(cellAtPoint(maze, 2.35, 1.5, keep, 0.3)).toEqual({ col: 2, row: 1 });
   });
 });
