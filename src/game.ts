@@ -1,6 +1,6 @@
 // Pick a vehicle, then drag a finger and it follows along the tunnels to the treasure.
 
-import { playFanfare, playStep, unlockAudio } from './audio';
+import { playBump, playFanfare, playStep, unlockAudio } from './audio';
 import { drawBedtime } from './bedtime';
 import {
   cellCenter,
@@ -14,7 +14,17 @@ import {
 } from './draw';
 import { isPreview, storagePrefix } from './env';
 import { setupLockScreen } from './lock';
-import { cellAtPoint, chooseGrid, findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
+import {
+  cellAtPoint,
+  chooseGrid,
+  findPath,
+  generateMaze,
+  neighbors,
+  pickGoal,
+  sameCell,
+  type Cell,
+  type Maze,
+} from './maze';
 import { limitsFromQuery, loadPlayState, savePlayState, shouldLock, type PlayState } from './playtime';
 import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
@@ -24,6 +34,8 @@ const SPEED = 4;
 const MAX_REACH = 3;
 /** How far, in cells, a finger must move past the edge of the cell it is on to pick another. */
 const SLACK = 0.3;
+/** Shortest gap between bump sounds, so a finger rubbing along a wall does not rattle. */
+const BUMP_INTERVAL_MS = 400;
 const OVERLAY_DELAY_MS = 900;
 const CONFETTI = ['#ffd23f', '#ff6fa8', '#5ad1ff', '#7be36a', '#ffffff'];
 
@@ -82,6 +94,9 @@ export function startGame({
   const otherPointers = new Set<number>();
   /** The cell the driving finger is on, kept while the finger stays near it. */
   let fingerCell: Cell | null = null;
+  /** Whether the driving finger is pushing into a wall; it bumps once per push. */
+  let pushingWall = false;
+  let lastBumpAt = -Infinity;
   let overlayTimer = 0;
 
   function insets(): { top: number; right: number; bottom: number; left: number } {
@@ -168,7 +183,11 @@ export function startGame({
   /** Plans a route to the driving finger's cell when it is close enough along the tunnels. */
   function steer(event: PointerEvent): boolean {
     const target = reachableCell(event, fingerCell);
-    if (!target) return false;
+    if (!target) {
+      bumpIntoWall(event);
+      return false;
+    }
+    pushingWall = false;
     fingerCell = target;
     activeHasSteered = true;
     const path = findPath(maze, current, target);
@@ -179,12 +198,30 @@ export function startGame({
     return true;
   }
 
+  /**
+   * Plays a bump when the driving finger leaves its cell through a wall or off the maze.
+   * A finger that merely runs ahead along an open tunnel gets no bump.
+   */
+  function bumpIntoWall(event: PointerEvent): void {
+    if (!fingerCell || pushingWall) return;
+    const from = fingerCell;
+    const cell = cellAt(event, from);
+    const throughWall = !cell || (!sameCell(cell, from) && !neighbors(maze, from).some((next) => sameCell(next, cell)));
+    if (!throughWall) return;
+    pushingWall = true;
+    const now = performance.now();
+    if (now - lastBumpAt < BUMP_INTERVAL_MS) return;
+    lastBumpAt = now;
+    playBump();
+  }
+
   function drive(event: PointerEvent): void {
     if (activePointer !== null) otherPointers.add(activePointer);
     otherPointers.delete(event.pointerId);
     activePointer = event.pointerId;
     activeHasSteered = false;
     fingerCell = null;
+    pushingWall = false;
     steer(event);
   }
 

@@ -25,6 +25,23 @@ function tone(frequency: number, delay: number, duration: number, type: Oscillat
   oscillator.stop(start + duration);
 }
 
+/** A soft, falling "boing" for bumping into a wall: playful, never a scolding buzzer. */
+export function playBump(): void {
+  if (!context) return;
+  const start = context.currentTime;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(330, start);
+  oscillator.frequency.exponentialRampToValueAtTime(140, start + 0.18);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.25, start + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+  oscillator.connect(gain).connect(context.destination);
+  oscillator.start(start);
+  oscillator.stop(start + 0.22);
+}
+
 export function playStep(): void {
   tone(180 + Math.random() * 60, 0, 0.09, 'triangle', 0.12);
 }
