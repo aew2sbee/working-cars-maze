@@ -53,6 +53,27 @@ export function chooseGrid(width: number, height: number): { cols: number; rows:
   return best;
 }
 
+/**
+ * The cell under a point given in cell units, or null off the grid. A point still within
+ * `slack` cells of `keep` stays on `keep`, so a wide, pressing finger resting on a boundary
+ * does not flicker into the cell next door (possibly across a wall).
+ */
+export function cellAtPoint(maze: Maze, x: number, y: number, keep: Cell | null, slack: number): Cell | null {
+  if (
+    keep &&
+    x >= keep.col - slack &&
+    x < keep.col + 1 + slack &&
+    y >= keep.row - slack &&
+    y < keep.row + 1 + slack
+  ) {
+    return keep;
+  }
+  const col = Math.floor(x);
+  const row = Math.floor(y);
+  if (col < 0 || row < 0 || col >= maze.cols || row >= maze.rows) return null;
+  return { col, row };
+}
+
 export function sameCell(a: Cell, b: Cell): boolean {
   return a.col === b.col && a.row === b.row;
 }
