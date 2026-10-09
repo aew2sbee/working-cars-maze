@@ -31,8 +31,9 @@ export function bedtime(
 ): 'play' | 'ask' | 'lock' {
   if (elapsedMs < limits.limitMs) return 'play';
   if (lastRoundFrom !== null) return elapsedMs >= lastRoundFrom + limits.graceMs ? 'lock' : 'play';
-  if (elapsedMs >= limits.limitMs + limits.graceMs) return 'lock';
-  return inMaze ? 'play' : 'ask';
+  // The question waits for a button however long it takes; only a maze in progress runs out.
+  if (!inMaze) return 'ask';
+  return elapsedMs >= limits.limitMs + limits.graceMs ? 'lock' : 'play';
 }
 
 const KEY = 'playtime';

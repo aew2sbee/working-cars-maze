@@ -29,9 +29,9 @@ describe('bedtime', () => {
     expect(bedtime(at(PLAY_LIMIT_MS + GRACE_MS), true)).toBe('lock');
   });
 
-  it('locks when nobody answers the question within 5 minutes', () => {
-    expect(bedtime(at(PLAY_LIMIT_MS + GRACE_MS - 1), false)).toBe('ask');
-    expect(bedtime(at(PLAY_LIMIT_MS + GRACE_MS), false)).toBe('lock');
+  it('keeps asking until a button is pressed, however long it takes', () => {
+    expect(bedtime(at(PLAY_LIMIT_MS + GRACE_MS), false)).toBe('ask');
+    expect(bedtime(at(PLAY_LIMIT_MS + 10 * GRACE_MS), false)).toBe('ask');
   });
 
   it('gives the one more maze its own 5 minutes, in or out of the maze', () => {
