@@ -36,6 +36,8 @@ const MAX_REACH = 3;
 const SLACK = 0.3;
 /** Shortest gap between bump sounds: a finger rubbing along a wall does not rattle, and one sound ends before the next. */
 const BUMP_INTERVAL_MS = 600;
+/** How long the mole shows it hurt after bumping into a wall. */
+const OUCH_SECONDS = 1;
 const OVERLAY_DELAY_MS = 900;
 const CONFETTI = ['#ffd23f', '#ff6fa8', '#5ad1ff', '#7be36a', '#ffffff'];
 
@@ -97,6 +99,8 @@ export function startGame({
   /** Whether the driving finger is pushing into a wall; it bumps once per push. */
   let pushingWall = false;
   let lastBumpAt = -Infinity;
+  /** When, in seconds on the animation clock, the mole last bumped into a wall. */
+  let ouchAt = -Infinity;
   let overlayTimer = 0;
 
   function insets(): { top: number; right: number; bottom: number; left: number } {
@@ -136,6 +140,7 @@ export function startGame({
     tracks = [];
     facing = 1;
     hasMoved = false;
+    ouchAt = -Infinity;
     phase = 'play';
     particles = [];
     clearTimeout(overlayTimer);
@@ -213,6 +218,7 @@ export function startGame({
     if (now - lastBumpAt < BUMP_INTERVAL_MS) return;
     lastBumpAt = now;
     playBump();
+    ouchAt = now / 1000;
   }
 
   function drive(event: PointerEvent): void {
@@ -246,6 +252,8 @@ export function startGame({
 
   function celebrate(): void {
     phase = 'clear';
+    // All smiles at the treasure, even right after a bump.
+    ouchAt = -Infinity;
     route = [];
     releasePointers();
     playFanfare();
@@ -318,7 +326,9 @@ export function startGame({
     const wiggle = time < hintUntil ? Math.sin(time * 30) * size * 0.04 : 0;
     const bob = moving ? Math.sin(time * 22) * size * 0.02 : 0;
     if (phase === 'play' && (!hasMoved || time < hintUntil)) drawHint(ctx, driver.x, driver.y, size * 0.6, time);
-    drawVehicle(ctx, vehicle, driver.x + wiggle, driver.y, size, facing, bob);
+    const ouch = Math.min(1, Math.max(0, 1 - (time - ouchAt) / OUCH_SECONDS));
+    const shake = reduceMotion.matches ? 0 : Math.sin(time * 70) * size * 0.04 * ouch ** 2;
+    drawVehicle(ctx, vehicle, driver.x + wiggle + shake, driver.y, size, facing, bob, true, ouch);
 
     // Once found, the open chest pops up above the vehicle instead of hiding under it.
     if (phase === 'clear') drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
