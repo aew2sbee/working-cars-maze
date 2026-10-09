@@ -4,6 +4,8 @@ import { makeProblem, type Problem } from './playtime';
 
 interface LockElements {
   screen: HTMLElement;
+  /** Takes focus when the lock screen appears, so a screen reader says "またあしたね". */
+  title: HTMLElement;
   adultButton: HTMLButtonElement;
   gate: HTMLElement;
   question: HTMLElement;
@@ -16,7 +18,7 @@ interface LockElements {
 const MAX_DIGITS = 2;
 
 export function setupLockScreen(elements: LockElements, onUnlock: () => void): { show(): void; hide(): void } {
-  const { screen, adultButton, gate, question, answer, hint, keys, backButton } = elements;
+  const { screen, title, adultButton, gate, question, answer, hint, keys, backButton } = elements;
   let problem: Problem | undefined;
   let typed = '';
 
@@ -79,11 +81,32 @@ export function setupLockScreen(elements: LockElements, onUnlock: () => void): {
   adultButton.addEventListener('click', openGate);
   backButton.addEventListener('click', closeGate);
 
+  // The gate is a modal dialog: Tab stays inside it, and Escape goes back.
+  gate.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeGate();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const buttons = [...gate.querySelectorAll<HTMLButtonElement>('button')];
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
   return {
     show() {
       gate.hidden = true;
       adultButton.hidden = false;
       screen.hidden = false;
+      // Whatever had focus (a vehicle, "もういっかい") was just hidden.
+      title.focus();
     },
     hide() {
       screen.hidden = true;
