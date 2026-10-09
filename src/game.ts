@@ -1,6 +1,6 @@
 // Pick a vehicle, then drag a finger and it follows along the tunnels to the treasure.
 
-import { playFanfare, playStep, unlockAudio } from './audio';
+import { playBump, playFanfare, playStep, unlockAudio } from './audio';
 import { drawBedtime } from './bedtime';
 import {
   cellCenter,
@@ -14,7 +14,17 @@ import {
 } from './draw';
 import { isPreview, storagePrefix } from './env';
 import { setupLockScreen } from './lock';
-import { cellAtPoint, chooseGrid, findPath, generateMaze, pickGoal, sameCell, type Cell, type Maze } from './maze';
+import {
+  cellAtPoint,
+  chooseGrid,
+  findPath,
+  generateMaze,
+  neighbors,
+  pickGoal,
+  sameCell,
+  type Cell,
+  type Maze,
+} from './maze';
 import { limitsFromQuery, loadPlayState, savePlayState, shouldLock, type PlayState } from './playtime';
 import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
@@ -24,6 +34,10 @@ const SPEED = 4;
 const MAX_REACH = 3;
 /** How far, in cells, a finger must move past the edge of the cell it is on to pick another. */
 const SLACK = 0.3;
+/** How long a finger must keep pushing into a wall, with the vehicle stopped, before it bumps. */
+const BUMP_HOLD_MS = 300;
+/** How long the mole shows it hurt after bumping into a wall. */
+const OUCH_SECONDS = 1;
 const OVERLAY_DELAY_MS = 900;
 const CONFETTI = ['#ffd23f', '#ff6fa8', '#5ad1ff', '#7be36a', '#ffffff'];
 
@@ -82,6 +96,13 @@ export function startGame({
   const otherPointers = new Set<number>();
   /** The cell the driving finger is on, kept while the finger stays near it. */
   let fingerCell: Cell | null = null;
+  /** Whether the driving finger is pushing into a wall; it bumps at most once per push. */
+  let pushingWall = false;
+  /** Since when the vehicle has stood still while the finger pushes into a wall. */
+  let stuckSince: number | null = null;
+  let bumped = false;
+  /** When, in seconds on the animation clock, the mole last bumped into a wall. */
+  let ouchAt = -Infinity;
   let overlayTimer = 0;
 
   function insets(): { top: number; right: number; bottom: number; left: number } {
@@ -121,6 +142,7 @@ export function startGame({
     tracks = [];
     facing = 1;
     hasMoved = false;
+    ouchAt = -Infinity;
     phase = 'play';
     particles = [];
     clearTimeout(overlayTimer);
@@ -168,7 +190,11 @@ export function startGame({
   /** Plans a route to the driving finger's cell when it is close enough along the tunnels. */
   function steer(event: PointerEvent): boolean {
     const target = reachableCell(event, fingerCell);
-    if (!target) return false;
+    if (!target) {
+      notePushingWall(event);
+      return false;
+    }
+    stopPushing();
     fingerCell = target;
     activeHasSteered = true;
     const path = findPath(maze, current, target);
@@ -179,12 +205,48 @@ export function startGame({
     return true;
   }
 
+  /**
+   * Notes when the driving finger leaves its cell through a wall or off the maze.
+   * A finger that merely runs ahead along an open tunnel is not pushing into a wall.
+   */
+  function notePushingWall(event: PointerEvent): void {
+    if (!fingerCell || pushingWall) return;
+    const from = fingerCell;
+    const cell = cellAt(event, from);
+    const throughWall = !cell || (!sameCell(cell, from) && !neighbors(maze, from).some((next) => sameCell(next, cell)));
+    if (!throughWall) return;
+    pushingWall = true;
+  }
+
+  /**
+   * Bumps once the finger has kept pushing into a wall for a while with the vehicle stopped,
+   * so brushing a wall on the way round a corner does not set it off.
+   */
+  function bumpWhenStuck(now: number): void {
+    if (!pushingWall || moving) {
+      stuckSince = null;
+      return;
+    }
+    stuckSince ??= now;
+    if (bumped || now - stuckSince < BUMP_HOLD_MS) return;
+    bumped = true;
+    playBump();
+    ouchAt = now / 1000;
+  }
+
+  function stopPushing(): void {
+    pushingWall = false;
+    stuckSince = null;
+    bumped = false;
+  }
+
   function drive(event: PointerEvent): void {
     if (activePointer !== null) otherPointers.add(activePointer);
     otherPointers.delete(event.pointerId);
     activePointer = event.pointerId;
     activeHasSteered = false;
     fingerCell = null;
+    stopPushing();
     steer(event);
   }
 
@@ -192,6 +254,7 @@ export function startGame({
     activePointer = null;
     otherPointers.clear();
     fingerCell = null;
+    stopPushing();
   }
 
   function arrive(cell: Cell): void {
@@ -209,6 +272,8 @@ export function startGame({
 
   function celebrate(): void {
     phase = 'clear';
+    // All smiles at the treasure, even right after a bump.
+    ouchAt = -Infinity;
     route = [];
     releasePointers();
     playFanfare();
@@ -281,7 +346,9 @@ export function startGame({
     const wiggle = time < hintUntil ? Math.sin(time * 30) * size * 0.04 : 0;
     const bob = moving ? Math.sin(time * 22) * size * 0.02 : 0;
     if (phase === 'play' && (!hasMoved || time < hintUntil)) drawHint(ctx, driver.x, driver.y, size * 0.6, time);
-    drawVehicle(ctx, vehicle, driver.x + wiggle, driver.y, size, facing, bob);
+    const ouch = Math.min(1, Math.max(0, 1 - (time - ouchAt) / OUCH_SECONDS));
+    const shake = reduceMotion.matches ? 0 : Math.sin(time * 70) * size * 0.04 * ouch ** 2;
+    drawVehicle(ctx, vehicle, driver.x + wiggle + shake, driver.y, size, facing, bob, true, ouch);
 
     // Once found, the open chest pops up above the vehicle instead of hiding under it.
     if (phase === 'clear') drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
@@ -454,6 +521,7 @@ export function startGame({
   let last = performance.now();
   const frame = (now: number): void => {
     update(Math.min((now - last) / 1000, 0.05));
+    bumpWhenStuck(now);
     last = now;
     render(now / 1000);
     requestAnimationFrame(frame);

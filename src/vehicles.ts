@@ -1,7 +1,7 @@
 // The vehicles a child can pick, each driven by the same mole in a hard hat.
 // Drawn facing right in a 100 x 100 box centred on (0, 0); flipped to face left.
 
-import { HAT, INK } from './draw';
+import { drawStar, HAT, INK } from './draw';
 
 export type VehicleId = 'crane' | 'excavator' | 'bulldozer' | 'dump';
 
@@ -27,6 +27,8 @@ export function drawVehicle(
   facing: 1 | -1,
   bob: number,
   driver = true,
+  /** 1 just after bumping into a wall, easing back to 0 over a second. */
+  ouch = 0,
 ): void {
   const u = size / 100;
   ctx.save();
@@ -39,23 +41,23 @@ export function drawVehicle(
 
   switch (id) {
     case 'crane':
-      drawCrane(ctx, driver);
+      drawCrane(ctx, driver, ouch);
       break;
     case 'excavator':
-      drawExcavator(ctx, driver);
+      drawExcavator(ctx, driver, ouch);
       break;
     case 'bulldozer':
-      drawBulldozer(ctx, driver);
+      drawBulldozer(ctx, driver, ouch);
       break;
     case 'dump':
-      drawDumpTruck(ctx, driver);
+      drawDumpTruck(ctx, driver, ouch);
       break;
   }
 
   ctx.restore();
 }
 
-function drawExcavator(ctx: CanvasRenderingContext2D, driver: boolean): void {
+function drawExcavator(ctx: CanvasRenderingContext2D, driver: boolean, ouch: number): void {
   drawCrawler(ctx);
   drawArm(ctx, [
     [14, -2],
@@ -64,11 +66,11 @@ function drawExcavator(ctx: CanvasRenderingContext2D, driver: boolean): void {
   ]);
   drawBucket(ctx);
   drawBody(ctx, -38, -8, 58, 24);
-  if (driver) drawMole(ctx, -14, -18);
+  if (driver) drawMole(ctx, -14, -18, ouch);
   if (driver) drawPaws(ctx, [-6, 4], -7);
 }
 
-function drawCrane(ctx: CanvasRenderingContext2D, driver: boolean): void {
+function drawCrane(ctx: CanvasRenderingContext2D, driver: boolean, ouch: number): void {
   drawCrawler(ctx);
   // Lattice boom: two rails with cross braces.
   ctx.beginPath();
@@ -99,11 +101,11 @@ function drawCrane(ctx: CanvasRenderingContext2D, driver: boolean): void {
   ctx.stroke();
   ctx.lineWidth = 3;
   drawBody(ctx, -38, -8, 58, 24);
-  if (driver) drawMole(ctx, -14, -18);
+  if (driver) drawMole(ctx, -14, -18, ouch);
   if (driver) drawPaws(ctx, [-6, 4], -7);
 }
 
-function drawBulldozer(ctx: CanvasRenderingContext2D, driver: boolean): void {
+function drawBulldozer(ctx: CanvasRenderingContext2D, driver: boolean, ouch: number): void {
   drawCrawler(ctx);
   // Push arm and the big blade in front.
   drawArm(ctx, [
@@ -135,11 +137,11 @@ function drawBulldozer(ctx: CanvasRenderingContext2D, driver: boolean): void {
   ctx.beginPath();
   ctx.roundRect(4, -20, 6, 13, 2);
   ctx.fill();
-  if (driver) drawMole(ctx, -16, -18);
+  if (driver) drawMole(ctx, -16, -18, ouch);
   if (driver) drawPaws(ctx, [-8, 2], -7);
 }
 
-function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean): void {
+function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean, ouch: number): void {
   // Chassis.
   ctx.fillStyle = RUBBER;
   ctx.beginPath();
@@ -174,7 +176,7 @@ function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean): void {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  if (driver) drawMole(ctx, 22, -20);
+  if (driver) drawMole(ctx, 22, -20, ouch);
   if (driver) drawPaws(ctx, [28, 38], -9);
   // Windshield frame in front of the mole.
   ctx.lineWidth = 4;
@@ -266,11 +268,12 @@ function drawBucket(ctx: CanvasRenderingContext2D): void {
   ctx.stroke();
 }
 
-/** The mole's head in a hard hat, centred on (hx, hy). */
-function drawMole(ctx: CanvasRenderingContext2D, hx: number, hy: number, scale = 1): void {
+/** The mole's head in a hard hat, centred on (hx, hy). With `ouch` above 0 it has just bumped a wall. */
+function drawMole(ctx: CanvasRenderingContext2D, hx: number, hy: number, ouch: number): void {
+  /** Progress through the reaction: 0 at the bump, 1 once it has worn off. */
+  const since = 1 - ouch;
   ctx.save();
   ctx.translate(hx, hy);
-  ctx.scale(scale, scale);
   ctx.strokeStyle = INK;
   ctx.lineWidth = 3;
 
@@ -284,17 +287,31 @@ function drawMole(ctx: CanvasRenderingContext2D, hx: number, hy: number, scale =
   ctx.arc(18, 3, 6, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  // A happy, squinting eye.
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(4, -2);
-  ctx.quadraticCurveTo(8, -6, 12, -2);
-  ctx.stroke();
   ctx.fillStyle = 'rgba(242, 155, 176, 0.6)';
   ctx.beginPath();
   ctx.arc(5, 7, 3.5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.beginPath();
+  if (ouch > 0) {
+    // Eyes squeezed shut: "><".
+    ctx.lineWidth = 3;
+    ctx.moveTo(4, -3.3);
+    ctx.lineTo(11, 0);
+    ctx.lineTo(4, 3.3);
+  } else {
+    // A happy, squinting eye.
+    ctx.lineWidth = 2.5;
+    ctx.moveTo(4, -2);
+    ctx.quadraticCurveTo(8, -6, 12, -2);
+  }
+  ctx.stroke();
 
+  // The hard hat jumps off the head for a moment and lands back, tilted.
+  const hop = since < 0.3 ? Math.sin((since / 0.3) * Math.PI) : 0;
+  ctx.save();
+  ctx.translate(0, -8 - hop * 9);
+  ctx.rotate(-hop * 0.3);
+  ctx.translate(0, 8);
   ctx.fillStyle = HAT;
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -306,6 +323,33 @@ function drawMole(ctx: CanvasRenderingContext2D, hx: number, hy: number, scale =
   ctx.roundRect(-19, -11, 38, 6, 3);
   ctx.fill();
   ctx.stroke();
+  ctx.restore();
+
+  if (ouch > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, ouch * 4);
+    ctx.lineWidth = 2;
+    // A drop of sweat flying off the back of the head, point up.
+    const dropX = -24 - since * 4;
+    const dropY = since * 5;
+    const dropR = 3.5;
+    const tip = 8.5;
+    const spread = Math.acos(dropR / tip);
+    ctx.fillStyle = '#9fdcff';
+    ctx.beginPath();
+    ctx.moveTo(dropX, dropY - tip);
+    ctx.arc(dropX, dropY, dropR, -Math.PI / 2 + spread, (Math.PI * 3) / 2 - spread);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Stars circling above the hat.
+    for (let i = 0; i < 3; i++) {
+      const a = since * Math.PI * 4 + (i * Math.PI * 2) / 3;
+      drawStar(ctx, Math.cos(a) * 20, -32 + Math.sin(a) * 5, 7, HAT);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   ctx.restore();
 }
 
