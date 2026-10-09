@@ -7,8 +7,8 @@ import {
   loadPlayState,
   makeProblem,
   PLAY_LIMIT_MS,
-  savePlayState,
   savedPlayState,
+  savePlayState,
 } from './playtime';
 import { mulberry32 } from './random';
 

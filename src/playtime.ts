@@ -50,11 +50,12 @@ export function savedPlayState(storage: Pick<Storage, 'getItem'> | undefined, pr
   }
 }
 
-/** Reads the saved state; anything missing or damaged counts as a fresh start. */
+/** Reads the state saved in storage. */
 export function loadPlayState(storage: Pick<Storage, 'getItem'> | undefined, prefix: string): PlayState {
   return parsePlayState(savedPlayState(storage, prefix));
 }
 
+/** Reads a saved state; anything missing or damaged counts as a fresh start. */
 export function parsePlayState(saved: string | null): PlayState {
   try {
     const state = JSON.parse(saved ?? 'null') as Partial<PlayState> | null;
