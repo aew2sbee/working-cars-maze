@@ -20,6 +20,7 @@ startGame({
   overlay: document.querySelector<HTMLElement>('#clear')!,
   againButton: document.querySelector<HTMLButtonElement>('#again')!,
   changeButton: document.querySelector<HTMLButtonElement>('#change')!,
+  sleepButton: document.querySelector<HTMLButtonElement>('#sleep')!,
   safeArea: document.querySelector<HTMLElement>('.safe-area')!,
   lock: {
     screen: document.querySelector<HTMLElement>('#lock')!,
