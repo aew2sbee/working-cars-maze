@@ -59,7 +59,8 @@ interface Elements {
   lock: Parameters<typeof setupLockScreen>[0];
 }
 
-type Phase = 'select' | 'play' | 'clear' | 'ask' | 'locked';
+/** 'cheer' is the short celebration at the treasure, before the "やったね！" buttons appear in 'clear'. */
+type Phase = 'select' | 'play' | 'cheer' | 'clear' | 'ask' | 'locked';
 
 /** How often play time is counted, and how many counts between saves. */
 const TICK_MS = 1000;
@@ -291,12 +292,17 @@ export function startGame({
   }
 
   function celebrate(): void {
-    phase = 'clear';
+    phase = 'cheer';
     // All smiles at the treasure, even right after a bump.
     ouchAt = -Infinity;
     route = [];
     releasePointers();
     playFanfare();
+    // That was the one more maze: lock now, so a reload during the celebration cannot skip it.
+    if (play.lastRoundFrom !== null) {
+      play.locked = true;
+      save();
+    }
     if (!reduceMotion.matches) {
       const { x, y } = cellCenter(layout, goal);
       particles = Array.from({ length: 70 }, () => {
@@ -315,12 +321,12 @@ export function startGame({
       });
     }
     overlayTimer = window.setTimeout(() => {
-      // That was the one more maze: go to bed instead of offering another.
-      if (play.lastRoundFrom !== null) {
+      if (play.locked) {
         lock();
         return;
       }
-      if (timeUp()) return;
+      if (checkBedtime(false)) return;
+      phase = 'clear';
       overlay.hidden = false;
       againButton.focus();
     }, OVERLAY_DELAY_MS);
@@ -360,7 +366,8 @@ export function startGame({
     drawTreadMarks(ctx, layout, tracks);
 
     const chest = cellCenter(layout, goal);
-    if (phase !== 'clear') drawChest(ctx, chest.x, chest.y, layout.cell * 0.6, time, false);
+    const found = phase === 'cheer' || phase === 'clear';
+    if (!found) drawChest(ctx, chest.x, chest.y, layout.cell * 0.6, time, false);
 
     const driver = cellCenter(layout, position);
     const size = layout.cell * 0.78;
@@ -372,7 +379,7 @@ export function startGame({
     drawVehicle(ctx, vehicle, driver.x + wiggle + shake, driver.y, size, facing, bob, true, ouch);
 
     // Once found, the open chest pops up above the vehicle instead of hiding under it.
-    if (phase === 'clear') drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
+    if (found) drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
 
     drawParticles(ctx, particles);
   }
@@ -406,17 +413,14 @@ export function startGame({
     if (document.hidden || phase === 'locked') return;
     play.elapsedMs += delta;
     if (++ticksSinceSave >= SAVE_EVERY_TICKS) save();
-    const inMaze = phase === 'play' || (phase === 'clear' && overlay.hidden === true);
+    checkBedtime(phase === 'play' || phase === 'cheer');
+  }
+
+  /** Asks about one more maze, or locks, once time is up. Returns whether it did either. */
+  function checkBedtime(inMaze: boolean): boolean {
     const next = bedtime(play, inMaze, limits);
     if (next === 'lock') lock();
     else if (next === 'ask' && phase !== 'ask') ask();
-  }
-
-  /** Outside a maze: asks about one more maze, or locks, once time is up. Returns whether it did. */
-  function timeUp(): boolean {
-    const next = bedtime(play, false, limits);
-    if (next === 'lock') lock();
-    else if (next === 'ask') ask();
     return next !== 'play';
   }
 
@@ -578,7 +582,7 @@ export function startGame({
   if (play.locked) lock();
   else {
     showSelect();
-    timeUp();
+    checkBedtime(false);
   }
   let last = performance.now();
   const frame = (now: number): void => {
