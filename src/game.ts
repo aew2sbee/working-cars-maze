@@ -65,6 +65,18 @@ type Phase = 'select' | 'play' | 'clear' | 'ask' | 'locked';
 const TICK_MS = 1000;
 const SAVE_EVERY_TICKS = 5;
 
+/** Sizes a picture's canvas to its displayed size, sharp on high-density screens, and returns its context. */
+function fitPicture(picture: HTMLCanvasElement): { pictureCtx: CanvasRenderingContext2D; width: number; height: number } {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const width = picture.clientWidth;
+  const height = picture.clientHeight;
+  picture.width = Math.round(width * dpr);
+  picture.height = Math.round(height * dpr);
+  const pictureCtx = picture.getContext('2d')!;
+  pictureCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { pictureCtx, width, height };
+}
+
 export function startGame({
   canvas,
   selectScreen,
@@ -395,13 +407,9 @@ export function startGame({
     play.elapsedMs += delta;
     if (++ticksSinceSave >= SAVE_EVERY_TICKS) save();
     const inMaze = phase === 'play' || (phase === 'clear' && overlay.hidden === true);
-    if (phase === 'ask') {
-      if (bedtime(play, false, limits) === 'lock') lock();
-    } else if (!inMaze) {
-      timeUp();
-    } else if (bedtime(play, true, limits) === 'lock') {
-      lock();
-    }
+    const next = bedtime(play, inMaze, limits);
+    if (next === 'lock') lock();
+    else if (next === 'ask' && phase !== 'ask') ask();
   }
 
   /** Outside a maze: asks about one more maze, or locks, once time is up. Returns whether it did. */
@@ -426,14 +434,7 @@ export function startGame({
   }
 
   function drawTiredMole(): void {
-    const { picture } = oneMore;
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const width = picture.clientWidth;
-    const height = picture.clientHeight;
-    picture.width = Math.round(width * dpr);
-    picture.height = Math.round(height * dpr);
-    const pictureCtx = picture.getContext('2d')!;
-    pictureCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { pictureCtx, width, height } = fitPicture(oneMore.picture);
     // The mole and its hat span about -54..82 across and -14..34 down, in hundredths of its size.
     const size = Math.min(width / 1.45, height / 0.55);
     drawSleepingMole(pictureCtx, width / 2 - size * 0.14, height / 2 - size * 0.1, size);
@@ -480,14 +481,8 @@ export function startGame({
 
   /** Draws each choice's picture at the button's current size. */
   function drawVehiclePictures(): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
     for (const picture of vehicleList.querySelectorAll<HTMLCanvasElement>('canvas[data-vehicle]')) {
-      const width = picture.clientWidth;
-      const height = picture.clientHeight;
-      picture.width = Math.round(width * dpr);
-      picture.height = Math.round(height * dpr);
-      const pictureCtx = picture.getContext('2d')!;
-      pictureCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const { pictureCtx, width, height } = fitPicture(picture);
       const size = Math.min(width, height * 1.1) * 0.82;
       drawVehicle(pictureCtx, picture.dataset.vehicle as VehicleId, width / 2, height * 0.56, size, 1, 0);
     }
