@@ -34,8 +34,8 @@ const SPEED = 4;
 const MAX_REACH = 3;
 /** How far, in cells, a finger must move past the edge of the cell it is on to pick another. */
 const SLACK = 0.3;
-/** Shortest gap between bump sounds, so a finger rubbing along a wall does not rattle. */
-const BUMP_INTERVAL_MS = 400;
+/** Shortest gap between bump sounds: a finger rubbing along a wall does not rattle, and one sound ends before the next. */
+const BUMP_INTERVAL_MS = 600;
 const OVERLAY_DELAY_MS = 900;
 const CONFETTI = ['#ffd23f', '#ff6fa8', '#5ad1ff', '#7be36a', '#ffffff'];
 
