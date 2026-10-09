@@ -25,7 +25,15 @@ import {
   type Cell,
   type Maze,
 } from './maze';
-import { limitsFromQuery, loadPlayState, savePlayState, shouldLock, type PlayState } from './playtime';
+import {
+  limitsFromQuery,
+  parsePlayState,
+  playStateKey,
+  savedPlayState,
+  savePlayState,
+  shouldLock,
+  type PlayState,
+} from './playtime';
 import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
 /** Driving speed in cells per second. */
@@ -365,14 +373,38 @@ export function startGame({
     }
   })();
   const limits = limitsFromQuery(location.search, isPreview || import.meta.env.DEV);
-  let play: PlayState = loadPlayState(storage, storagePrefix);
+  /** The state as this tab last saved or read it; anything else in storage was saved by another tab. */
+  let known = savedPlayState(storage, storagePrefix);
+  let play: PlayState = parsePlayState(known);
   let lastTick = performance.now();
   let ticksSinceSave = 0;
   const lockScreen = setupLockScreen(lockElements, unlock);
 
   function save(): void {
     ticksSinceSave = 0;
-    savePlayState(storage, storagePrefix, play);
+    known = savePlayState(storage, storagePrefix, play) ?? known;
+  }
+
+  /**
+   * Saves this tab's count, unless another tab has saved since. Then that tab's state wins,
+   * so a tab left open in the background cannot write back an old, unlocked state.
+   */
+  function sync(): void {
+    if (!adopt(savedPlayState(storage, storagePrefix))) save();
+  }
+
+  /** Takes over a state another tab saved, locking or unlocking to match. Returns whether it did. */
+  function adopt(saved: string | null): boolean {
+    if (saved === null || saved === known) return false;
+    known = saved;
+    play = parsePlayState(saved);
+    ticksSinceSave = 0;
+    if (play.locked && phase !== 'locked') lock();
+    else if (!play.locked && phase === 'locked') {
+      lockScreen.hide();
+      showSelect();
+    }
+    return true;
   }
 
   function countPlayTime(): void {
@@ -382,7 +414,7 @@ export function startGame({
     lastTick = now;
     if (document.hidden || phase === 'locked') return;
     play.elapsedMs += delta;
-    if (++ticksSinceSave >= SAVE_EVERY_TICKS) save();
+    if (++ticksSinceSave >= SAVE_EVERY_TICKS) sync();
     const inMaze = phase === 'play' || (phase === 'clear' && overlay.hidden === true);
     if (shouldLock(play.elapsedMs, inMaze, limits)) lock();
   }
@@ -510,9 +542,14 @@ export function startGame({
   window.setInterval(countPlayTime, TICK_MS);
   document.addEventListener('visibilitychange', () => {
     lastTick = performance.now();
-    if (document.hidden) save();
+    if (document.hidden) sync();
+    else adopt(savedPlayState(storage, storagePrefix));
   });
-  window.addEventListener('pagehide', save);
+  window.addEventListener('pagehide', sync);
+  // Another tab locked or unlocked: follow it at once, even while this tab is in the background.
+  window.addEventListener('storage', (event) => {
+    if (event.key === playStateKey(storagePrefix)) adopt(event.newValue);
+  });
 
   // A maze sits behind the select screen so the canvas always has something to draw.
   newMaze();

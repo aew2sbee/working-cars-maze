@@ -27,27 +27,48 @@ export function shouldLock(elapsedMs: number, inMaze: boolean, limits: Limits = 
   return !inMaze || elapsedMs >= limits.limitMs + limits.graceMs;
 }
 
-const KEY = 'playtime';
+/** The storage key, also used to spot another tab saving through the `storage` event. */
+export function playStateKey(prefix: string): string {
+  return prefix + 'playtime';
+}
+
+/** The saved state exactly as stored, to tell whether another tab has saved since. */
+export function savedPlayState(storage: Pick<Storage, 'getItem'> | undefined, prefix: string): string | null {
+  try {
+    return storage?.getItem(playStateKey(prefix)) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Reads the saved state; anything missing or damaged counts as a fresh start. */
 export function loadPlayState(storage: Pick<Storage, 'getItem'> | undefined, prefix: string): PlayState {
+  return parsePlayState(savedPlayState(storage, prefix));
+}
+
+export function parsePlayState(saved: string | null): PlayState {
   try {
-    const saved = JSON.parse(storage?.getItem(prefix + KEY) ?? 'null') as Partial<PlayState> | null;
-    const elapsedMs = Number(saved?.elapsedMs);
+    const state = JSON.parse(saved ?? 'null') as Partial<PlayState> | null;
+    const elapsedMs = Number(state?.elapsedMs);
     return {
       elapsedMs: Number.isFinite(elapsedMs) && elapsedMs > 0 ? elapsedMs : 0,
-      locked: saved?.locked === true,
+      locked: state?.locked === true,
     };
   } catch {
     return { elapsedMs: 0, locked: false };
   }
 }
 
-export function savePlayState(storage: Pick<Storage, 'setItem'> | undefined, prefix: string, state: PlayState): void {
+/** Saves the state and returns it as stored, or null when it could not be saved. */
+export function savePlayState(storage: Pick<Storage, 'setItem'> | undefined, prefix: string, state: PlayState): string | null {
+  if (!storage) return null;
+  const saved = JSON.stringify(state);
   try {
-    storage?.setItem(prefix + KEY, JSON.stringify(state));
+    storage.setItem(playStateKey(prefix), saved);
+    return saved;
   } catch {
     // Private mode or full storage: keep counting in memory.
+    return null;
   }
 }
 
