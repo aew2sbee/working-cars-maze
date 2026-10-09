@@ -35,7 +35,7 @@ const MAX_REACH = 3;
 /** How far, in cells, a finger must move past the edge of the cell it is on to pick another. */
 const SLACK = 0.3;
 /** How long a finger must keep pushing into a wall, with the vehicle stopped, before it bumps. */
-const BUMP_HOLD_MS = 500;
+const BUMP_HOLD_MS = 300;
 /** How long the mole shows it hurt after bumping into a wall. */
 const OUCH_SECONDS = 1;
 const OVERLAY_DELAY_MS = 900;
