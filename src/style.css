@@ -317,10 +317,6 @@ body {
 
 /* Phones held sideways: smaller pieces so the whole card fits without scrolling. */
 @media (max-height: 520px) {
-  .one-more__picture {
-    max-height: 22vh;
-  }
-
   .one-more__title {
     font-size: clamp(18px, 5vh, 26px);
   }

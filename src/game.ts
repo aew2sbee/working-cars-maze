@@ -394,8 +394,8 @@ export function startGame({
   })();
   const limits = limitsFromQuery(location.search, isPreview || import.meta.env.DEV);
   let play: PlayState = loadPlayState(storage, storagePrefix);
-  /** Where "あと いっかい" goes back to: the select screen, or straight into a new maze. */
-  let askedFrom: Phase = 'select';
+  /** Whether "あと いっかい" goes back to the select screen, rather than straight into a new maze. */
+  let askedFromSelect = true;
   let lastTick = performance.now();
   let ticksSinceSave = 0;
   const lockScreen = setupLockScreen(lockElements, unlock);
@@ -413,7 +413,8 @@ export function startGame({
     if (document.hidden || phase === 'locked') return;
     play.elapsedMs += delta;
     if (++ticksSinceSave >= SAVE_EVERY_TICKS) save();
-    checkBedtime(phase === 'play' || phase === 'cheer');
+    // The celebration decides for itself once it ends, so the question is not skipped.
+    if (phase !== 'cheer') checkBedtime(phase === 'play');
   }
 
   /** Asks about one more maze, or locks, once time is up. Returns whether it did either. */
@@ -425,7 +426,7 @@ export function startGame({
   }
 
   function ask(): void {
-    askedFrom = phase;
+    askedFromSelect = phase === 'select';
     phase = 'ask';
     route = [];
     releasePointers();
@@ -444,15 +445,19 @@ export function startGame({
     drawSleepingMole(pictureCtx, width / 2 - size * 0.14, height / 2 - size * 0.1, size);
   }
 
+  // Each handler acts only while asking, so a quick double tap does not run it twice.
   oneMore.yesButton.addEventListener('click', () => {
+    if (phase !== 'ask') return;
     unlockAudio();
     play.lastRoundFrom = play.elapsedMs;
     save();
     oneMore.dialog.hidden = true;
-    if (askedFrom === 'select') showSelect();
+    if (askedFromSelect) showSelect();
     else newMaze();
   });
-  oneMore.noButton.addEventListener('click', () => lock());
+  oneMore.noButton.addEventListener('click', () => {
+    if (phase === 'ask') lock();
+  });
 
   function lock(): void {
     phase = 'locked';
