@@ -39,6 +39,11 @@ const BUMP_HOLD_MS = 300;
 /** How long the mole shows it hurt after bumping into a wall. */
 const OUCH_SECONDS = 1;
 const OVERLAY_DELAY_MS = 900;
+/**
+ * The lock screen only twinkles and snores, and may stay up for hours on an iPad,
+ * so it is redrawn at most this often rather than every frame.
+ */
+const BEDTIME_FRAME_MS = 100;
 const CONFETTI = ['#ffd23f', '#ff6fa8', '#5ad1ff', '#7be36a', '#ffffff'];
 
 interface Elements {
@@ -104,6 +109,8 @@ export function startGame({
   /** When, in seconds on the animation clock, the mole last bumped into a wall. */
   let ouchAt = -Infinity;
   let overlayTimer = 0;
+  /** When the lock screen was last drawn; resizing clears the canvas, so it resets this. */
+  let bedtimeDrawnAt = -Infinity;
 
   function insets(): { top: number; right: number; bottom: number; left: number } {
     const style = getComputedStyle(safeArea);
@@ -154,6 +161,7 @@ export function startGame({
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    bedtimeDrawnAt = -Infinity;
     for (const target of [canvas, background]) {
       target.width = Math.round(width * dpr);
       target.height = Math.round(height * dpr);
@@ -520,11 +528,15 @@ export function startGame({
   else showSelect();
   let last = performance.now();
   const frame = (now: number): void => {
+    requestAnimationFrame(frame);
     update(Math.min((now - last) / 1000, 0.05));
     bumpWhenStuck(now);
     last = now;
+    if (phase === 'locked') {
+      if (now - bedtimeDrawnAt < BEDTIME_FRAME_MS) return;
+      bedtimeDrawnAt = now;
+    }
     render(now / 1000);
-    requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 }
