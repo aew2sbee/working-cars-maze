@@ -267,8 +267,6 @@ body {
   font-weight: 800;
   line-height: 1.5;
   text-align: center;
-  /* Break lines only at the spaces between words. */
-  word-break: keep-all;
 }
 
 .one-more__buttons {
@@ -330,6 +328,23 @@ body {
   .one-more__buttons button {
     min-height: 64px;
     font-size: clamp(22px, 6.5vh, 30px);
+  }
+}
+
+/* Small phones (an iPhone SE is 320px wide): smaller words and buttons so each line fits. */
+@media (max-width: 360px) {
+  .one-more__card {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .one-more__title {
+    font-size: 18px;
+  }
+
+  .one-more__buttons button {
+    padding: 0 18px;
+    font-size: 24px;
   }
 }
 

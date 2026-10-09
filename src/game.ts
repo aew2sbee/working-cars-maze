@@ -49,7 +49,7 @@ interface Elements {
   againButton: HTMLButtonElement;
   changeButton: HTMLButtonElement;
   safeArea: HTMLElement;
-  /** "あと いっかい やりますか？", asked when time is up instead of locking straight away. */
+  /** "あといっかいやる？", asked when time is up instead of locking straight away. */
   oneMore: {
     dialog: HTMLElement;
     picture: HTMLCanvasElement;
