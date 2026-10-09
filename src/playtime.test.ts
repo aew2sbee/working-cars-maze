@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bedtime,
   DEFAULT_LIMITS,
   GRACE_MS,
   limitsFromQuery,
@@ -8,24 +9,38 @@ import {
   PLAY_LIMIT_MS,
   savePlayState,
   savedPlayState,
-  shouldLock,
 } from './playtime';
 import { mulberry32 } from './random';
 
-describe('shouldLock', () => {
-  it('does not lock before 25 minutes', () => {
-    expect(shouldLock(PLAY_LIMIT_MS - 1, false)).toBe(false);
-    expect(shouldLock(PLAY_LIMIT_MS - 1, true)).toBe(false);
+describe('bedtime', () => {
+  const at = (elapsedMs: number, lastRoundFrom: number | null = null) => ({ elapsedMs, lastRoundFrom });
+
+  it('keeps playing before 25 minutes', () => {
+    expect(bedtime(at(PLAY_LIMIT_MS - 1), false)).toBe('play');
+    expect(bedtime(at(PLAY_LIMIT_MS - 1), true)).toBe('play');
   });
 
-  it('locks at 25 minutes outside a maze', () => {
-    expect(shouldLock(PLAY_LIMIT_MS, false)).toBe(true);
+  it('asks about one more maze at 25 minutes outside a maze', () => {
+    expect(bedtime(at(PLAY_LIMIT_MS), false)).toBe('ask');
   });
 
   it('lets a maze in progress finish, for up to 5 more minutes', () => {
-    expect(shouldLock(PLAY_LIMIT_MS, true)).toBe(false);
-    expect(shouldLock(PLAY_LIMIT_MS + GRACE_MS - 1, true)).toBe(false);
-    expect(shouldLock(PLAY_LIMIT_MS + GRACE_MS, true)).toBe(true);
+    expect(bedtime(at(PLAY_LIMIT_MS), true)).toBe('play');
+    expect(bedtime(at(PLAY_LIMIT_MS + GRACE_MS - 1), true)).toBe('play');
+    expect(bedtime(at(PLAY_LIMIT_MS + GRACE_MS), true)).toBe('lock');
+  });
+
+  it('keeps asking until a button is pressed, however long it takes', () => {
+    expect(bedtime(at(PLAY_LIMIT_MS + GRACE_MS), false)).toBe('ask');
+    expect(bedtime(at(PLAY_LIMIT_MS + 10 * GRACE_MS), false)).toBe('ask');
+  });
+
+  it('gives the one more maze its own 5 minutes, in or out of the maze', () => {
+    const from = PLAY_LIMIT_MS + 4 * 60_000;
+    expect(bedtime(at(from, from), false)).toBe('play');
+    expect(bedtime(at(from + GRACE_MS - 1, from), true)).toBe('play');
+    expect(bedtime(at(from + GRACE_MS, from), true)).toBe('lock');
+    expect(bedtime(at(from + GRACE_MS, from), false)).toBe('lock');
   });
 });
 
@@ -46,31 +61,37 @@ function memoryStorage(): Storage {
 describe('play state storage', () => {
   it('keeps the lock and the time across a reload', () => {
     const storage = memoryStorage();
-    const saved = savePlayState(storage, 'p:', { elapsedMs: 1234, locked: true });
+    const saved = savePlayState(storage, 'p:', { elapsedMs: 1234, locked: true, lastRoundFrom: null });
     expect(saved).toBe(savedPlayState(storage, 'p:'));
-    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 1234, locked: true });
+    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 1234, locked: true, lastRoundFrom: null });
+  });
+
+  it('remembers that the one more maze was already chosen', () => {
+    const storage = memoryStorage();
+    savePlayState(storage, 'p:', { elapsedMs: 1600, locked: false, lastRoundFrom: 1500 });
+    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 1600, locked: false, lastRoundFrom: 1500 });
   });
 
   it('keeps production and each preview apart by prefix', () => {
     const storage = memoryStorage();
-    savePlayState(storage, '/working-cars-maze/:', { elapsedMs: 1, locked: true });
-    expect(loadPlayState(storage, '/working-cars-maze/pr-preview/pr-5/:')).toEqual({ elapsedMs: 0, locked: false });
+    savePlayState(storage, '/working-cars-maze/:', { elapsedMs: 1, locked: true, lastRoundFrom: null });
+    expect(loadPlayState(storage, '/working-cars-maze/pr-preview/pr-5/:')).toEqual({ elapsedMs: 0, locked: false, lastRoundFrom: null });
   });
 
   it('starts fresh when nothing is saved, the data is damaged or storage is unavailable', () => {
     const storage = memoryStorage();
-    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 0, locked: false });
+    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 0, locked: false, lastRoundFrom: null });
     storage.setItem('p:playtime', '{not json');
-    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 0, locked: false });
+    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 0, locked: false, lastRoundFrom: null });
     storage.setItem('p:playtime', JSON.stringify({ elapsedMs: -5, locked: 'yes' }));
-    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 0, locked: false });
-    expect(loadPlayState(undefined, 'p:')).toEqual({ elapsedMs: 0, locked: false });
+    expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 0, locked: false, lastRoundFrom: null });
+    expect(loadPlayState(undefined, 'p:')).toEqual({ elapsedMs: 0, locked: false, lastRoundFrom: null });
   });
 
   it('does not throw when storage refuses to save', () => {
     const full = { setItem: () => { throw new Error('QuotaExceededError'); } };
-    expect(savePlayState(full, 'p:', { elapsedMs: 1, locked: false })).toBeNull();
-    expect(savePlayState(undefined, 'p:', { elapsedMs: 1, locked: false })).toBeNull();
+    expect(savePlayState(full, 'p:', { elapsedMs: 1, locked: false, lastRoundFrom: null })).toBeNull();
+    expect(savePlayState(undefined, 'p:', { elapsedMs: 1, locked: false, lastRoundFrom: null })).toBeNull();
   });
 });
 

@@ -26,15 +26,15 @@ import {
   type Maze,
 } from './maze';
 import {
+  bedtime,
   limitsFromQuery,
   parsePlayState,
   playStateKey,
   savedPlayState,
   savePlayState,
-  shouldLock,
   type PlayState,
 } from './playtime';
-import { drawVehicle, VEHICLES, type VehicleId } from './vehicles';
+import { drawSleepingMole, drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
 /** Driving speed in cells per second. */
 const SPEED = 4;
@@ -56,15 +56,37 @@ interface Elements {
   overlay: HTMLElement;
   againButton: HTMLButtonElement;
   changeButton: HTMLButtonElement;
+  /** Lets the child end play and go to bed in the middle of a maze. */
+  sleepButton: HTMLButtonElement;
   safeArea: HTMLElement;
+  /** "あといっかいやる？", asked when time is up instead of locking straight away. */
+  oneMore: {
+    dialog: HTMLElement;
+    picture: HTMLCanvasElement;
+    yesButton: HTMLButtonElement;
+    noButton: HTMLButtonElement;
+  };
   lock: Parameters<typeof setupLockScreen>[0];
 }
 
-type Phase = 'select' | 'play' | 'clear' | 'locked';
+/** 'cheer' is the short celebration at the treasure, before the "やったね！" buttons appear in 'clear'. */
+type Phase = 'select' | 'play' | 'cheer' | 'clear' | 'ask' | 'locked';
 
 /** How often play time is counted, and how many counts between saves. */
 const TICK_MS = 1000;
 const SAVE_EVERY_TICKS = 5;
+
+/** Sizes a picture's canvas to its displayed size, sharp on high-density screens, and returns its context. */
+function fitPicture(picture: HTMLCanvasElement): { pictureCtx: CanvasRenderingContext2D; width: number; height: number } {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const width = picture.clientWidth;
+  const height = picture.clientHeight;
+  picture.width = Math.round(width * dpr);
+  picture.height = Math.round(height * dpr);
+  const pictureCtx = picture.getContext('2d')!;
+  pictureCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { pictureCtx, width, height };
+}
 
 export function startGame({
   canvas,
@@ -73,7 +95,9 @@ export function startGame({
   overlay,
   againButton,
   changeButton,
+  sleepButton,
   safeArea,
+  oneMore,
   lock: lockElements,
 }: Elements): void {
   const ctx = canvas.getContext('2d')!;
@@ -152,6 +176,7 @@ export function startGame({
     hasMoved = false;
     ouchAt = -Infinity;
     phase = 'play';
+    sleepButton.hidden = false;
     particles = [];
     clearTimeout(overlayTimer);
     overlay.hidden = true;
@@ -279,12 +304,18 @@ export function startGame({
   }
 
   function celebrate(): void {
-    phase = 'clear';
+    phase = 'cheer';
+    sleepButton.hidden = true;
     // All smiles at the treasure, even right after a bump.
     ouchAt = -Infinity;
     route = [];
     releasePointers();
     playFanfare();
+    // That was the one more maze: lock now, so a reload during the celebration cannot skip it.
+    if (play.lastRoundFrom !== null) {
+      play.locked = true;
+      save();
+    }
     if (!reduceMotion.matches) {
       const { x, y } = cellCenter(layout, goal);
       particles = Array.from({ length: 70 }, () => {
@@ -303,11 +334,12 @@ export function startGame({
       });
     }
     overlayTimer = window.setTimeout(() => {
-      // Time is up: this was the last maze, so go to bed instead of offering another.
-      if (shouldLock(play.elapsedMs, false, limits)) {
+      if (play.locked) {
         lock();
         return;
       }
+      if (checkBedtime(false)) return;
+      phase = 'clear';
       overlay.hidden = false;
       againButton.focus();
     }, OVERLAY_DELAY_MS);
@@ -347,7 +379,8 @@ export function startGame({
     drawTreadMarks(ctx, layout, tracks);
 
     const chest = cellCenter(layout, goal);
-    if (phase !== 'clear') drawChest(ctx, chest.x, chest.y, layout.cell * 0.6, time, false);
+    const found = phase === 'cheer' || phase === 'clear';
+    if (!found) drawChest(ctx, chest.x, chest.y, layout.cell * 0.6, time, false);
 
     const driver = cellCenter(layout, position);
     const size = layout.cell * 0.78;
@@ -359,7 +392,7 @@ export function startGame({
     drawVehicle(ctx, vehicle, driver.x + wiggle + shake, driver.y, size, facing, bob, true, ouch);
 
     // Once found, the open chest pops up above the vehicle instead of hiding under it.
-    if (phase === 'clear') drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
+    if (found) drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
 
     drawParticles(ctx, particles);
   }
@@ -376,6 +409,8 @@ export function startGame({
   /** The state as this tab last saved or read it; anything else in storage was saved by another tab. */
   let known = savedPlayState(storage, storagePrefix);
   let play: PlayState = parsePlayState(known);
+  /** Whether "あと いっかい" goes back to the select screen, rather than straight into a new maze. */
+  let askedFromSelect = true;
   let lastTick = performance.now();
   let ticksSinceSave = 0;
   const lockScreen = setupLockScreen(lockElements, unlock);
@@ -388,9 +423,12 @@ export function startGame({
   /**
    * Saves this tab's count, unless another tab has saved since. Then that tab's state wins,
    * so a tab left open in the background cannot write back an old, unlocked state.
+   * Returns whether it took another tab's state.
    */
-  function sync(): void {
-    if (!adopt(savedPlayState(storage, storagePrefix))) save();
+  function sync(): boolean {
+    if (adopt(savedPlayState(storage, storagePrefix))) return true;
+    save();
+    return false;
   }
 
   /** Takes over a state another tab saved, locking or unlocking to match. Returns whether it did. */
@@ -400,8 +438,10 @@ export function startGame({
     play = parsePlayState(saved);
     ticksSinceSave = 0;
     if (play.locked && phase !== 'locked') lock();
-    else if (!play.locked && phase === 'locked') {
+    else if (!play.locked && (phase === 'locked' || (phase === 'ask' && bedtime(play, false, limits) === 'play'))) {
+      // Unlocked by an adult, or "あと いっかい" chosen, in the other tab.
       lockScreen.hide();
+      oneMore.dialog.hidden = true;
       showSelect();
     }
     return true;
@@ -414,13 +454,57 @@ export function startGame({
     lastTick = now;
     if (document.hidden || phase === 'locked') return;
     play.elapsedMs += delta;
-    if (++ticksSinceSave >= SAVE_EVERY_TICKS) sync();
-    const inMaze = phase === 'play' || (phase === 'clear' && overlay.hidden === true);
-    if (shouldLock(play.elapsedMs, inMaze, limits)) lock();
+    // Another tab's state, once taken, has already locked or unlocked this tab to match.
+    if (++ticksSinceSave >= SAVE_EVERY_TICKS && sync()) return;
+    // The celebration decides for itself once it ends, so the question is not skipped.
+    if (phase !== 'cheer') checkBedtime(phase === 'play');
   }
+
+  /** Asks about one more maze, or locks, once time is up. Returns whether it did either. */
+  function checkBedtime(inMaze: boolean): boolean {
+    const next = bedtime(play, inMaze, limits);
+    if (next === 'lock') lock();
+    else if (next === 'ask' && phase !== 'ask') ask();
+    return next !== 'play';
+  }
+
+  function ask(): void {
+    askedFromSelect = phase === 'select';
+    phase = 'ask';
+    route = [];
+    releasePointers();
+    clearTimeout(overlayTimer);
+    overlay.hidden = true;
+    selectScreen.hidden = true;
+    oneMore.dialog.hidden = false;
+    drawTiredMole();
+    oneMore.yesButton.focus();
+  }
+
+  function drawTiredMole(): void {
+    const { pictureCtx, width, height } = fitPicture(oneMore.picture);
+    // The mole and its hat span about -54..82 across and -14..34 down, in hundredths of its size.
+    const size = Math.min(width / 1.45, height / 0.55);
+    drawSleepingMole(pictureCtx, width / 2 - size * 0.14, height / 2 - size * 0.1, size);
+  }
+
+  // Each handler acts only while asking, so a quick double tap does not run it twice.
+  oneMore.yesButton.addEventListener('click', () => {
+    if (phase !== 'ask') return;
+    unlockAudio();
+    play.lastRoundFrom = play.elapsedMs;
+    save();
+    oneMore.dialog.hidden = true;
+    if (askedFromSelect) showSelect();
+    else newMaze();
+  });
+  oneMore.noButton.addEventListener('click', () => {
+    if (phase === 'ask') lock();
+  });
 
   function lock(): void {
     phase = 'locked';
+    sleepButton.hidden = true;
     play.locked = true;
     save();
     route = [];
@@ -428,11 +512,12 @@ export function startGame({
     clearTimeout(overlayTimer);
     overlay.hidden = true;
     selectScreen.hidden = true;
+    oneMore.dialog.hidden = true;
     lockScreen.show();
   }
 
   function unlock(): void {
-    play = { elapsedMs: 0, locked: false };
+    play = { elapsedMs: 0, locked: false, lastRoundFrom: null };
     save();
     lockScreen.hide();
     showSelect();
@@ -440,6 +525,7 @@ export function startGame({
 
   function showSelect(): void {
     phase = 'select';
+    sleepButton.hidden = true;
     clearTimeout(overlayTimer);
     overlay.hidden = true;
     selectScreen.hidden = false;
@@ -449,14 +535,8 @@ export function startGame({
 
   /** Draws each choice's picture at the button's current size. */
   function drawVehiclePictures(): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
     for (const picture of vehicleList.querySelectorAll<HTMLCanvasElement>('canvas[data-vehicle]')) {
-      const width = picture.clientWidth;
-      const height = picture.clientHeight;
-      picture.width = Math.round(width * dpr);
-      picture.height = Math.round(height * dpr);
-      const pictureCtx = picture.getContext('2d')!;
-      pictureCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const { pictureCtx, width, height } = fitPicture(picture);
       const size = Math.min(width, height * 1.1) * 0.82;
       drawVehicle(pictureCtx, picture.dataset.vehicle as VehicleId, width / 2, height * 0.56, size, 1, 0);
     }
@@ -522,9 +602,12 @@ export function startGame({
     newMaze();
   });
   changeButton.addEventListener('click', showSelect);
+  // Going to bed is the same as running out of time: an adult unlocks the next session.
+  sleepButton.addEventListener('click', lock);
   window.addEventListener('resize', () => {
     resize();
     if (phase === 'select') drawVehiclePictures();
+    if (phase === 'ask') drawTiredMole();
   });
 
   if (import.meta.env.DEV) {
@@ -553,8 +636,11 @@ export function startGame({
 
   // A maze sits behind the select screen so the canvas always has something to draw.
   newMaze();
-  if (play.locked || shouldLock(play.elapsedMs, false, limits)) lock();
-  else showSelect();
+  if (play.locked) lock();
+  else {
+    showSelect();
+    checkBedtime(false);
+  }
   let last = performance.now();
   const frame = (now: number): void => {
     update(Math.min((now - last) / 1000, 0.05));
