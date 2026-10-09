@@ -11,18 +11,71 @@ export function unlockAudio(): void {
   if (context.state === 'suspended') void context.resume();
 }
 
+/**
+ * An oscillator wired through its own gain to the speakers. The caller sets pitch and volume
+ * before starting it, so it never sounds for an instant at the default settings.
+ */
+function voice(audio: AudioContext, type: OscillatorType): { oscillator: OscillatorNode; gain: GainNode } {
+  const oscillator = audio.createOscillator();
+  const gain = audio.createGain();
+  oscillator.type = type;
+  oscillator.connect(gain).connect(audio.destination);
+  return { oscillator, gain };
+}
+
 function tone(frequency: number, delay: number, duration: number, type: OscillatorType, volume: number): void {
   if (!context) return;
   const start = context.currentTime + delay;
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  oscillator.type = type;
+  const { oscillator, gain } = voice(context, type);
   oscillator.frequency.setValueAtTime(frequency, start);
   gain.gain.setValueAtTime(volume, start);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  oscillator.connect(gain).connect(context.destination);
   oscillator.start(start);
   oscillator.stop(start + duration);
+}
+
+/**
+ * A comic "ぽこっ、びよよ〜ん" for bumping into a wall: a quick knock, then a wobbly spring.
+ * Silly rather than scolding, and nothing like the low thud of a step.
+ */
+export function playBump(): void {
+  if (!context) return;
+  const now = context.currentTime;
+
+  // ぽこっ: a short, hollow knock.
+  const knock = voice(context, 'sine');
+  knock.oscillator.frequency.setValueAtTime(820, now);
+  knock.oscillator.frequency.exponentialRampToValueAtTime(380, now + 0.05);
+  knock.gain.gain.setValueAtTime(0.3, now);
+  knock.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+  knock.oscillator.start(now);
+  knock.oscillator.stop(now + 0.07);
+
+  // びよよ〜ん: a spring that leaps up and wobbles as it settles.
+  const start = now + 0.045;
+  const end = start + 0.55;
+  const spring = voice(context, 'triangle');
+  spring.oscillator.frequency.setValueAtTime(260, start);
+  spring.oscillator.frequency.exponentialRampToValueAtTime(560, start + 0.12);
+  spring.oscillator.frequency.exponentialRampToValueAtTime(470, end);
+  spring.gain.gain.setValueAtTime(0.0001, start);
+  spring.gain.gain.exponentialRampToValueAtTime(0.2, start + 0.015);
+  spring.gain.gain.exponentialRampToValueAtTime(0.035, end - 0.03);
+  spring.gain.gain.linearRampToValueAtTime(0, end);
+
+  const wobble = context.createOscillator();
+  const depth = context.createGain();
+  wobble.type = 'sine';
+  wobble.frequency.setValueAtTime(14, start);
+  depth.gain.setValueAtTime(320, start);
+  depth.gain.exponentialRampToValueAtTime(220, start + 0.25);
+  depth.gain.exponentialRampToValueAtTime(40, end);
+  wobble.connect(depth).connect(spring.oscillator.detune);
+
+  spring.oscillator.start(start);
+  wobble.start(start);
+  spring.oscillator.stop(end);
+  wobble.stop(end);
 }
 
 export function playStep(): void {
