@@ -34,8 +34,8 @@ const SPEED = 4;
 const MAX_REACH = 3;
 /** How far, in cells, a finger must move past the edge of the cell it is on to pick another. */
 const SLACK = 0.3;
-/** Shortest gap between bump sounds: a finger rubbing along a wall does not rattle, and one sound ends before the next. */
-const BUMP_INTERVAL_MS = 600;
+/** How long a finger must keep pushing into a wall, with the vehicle stopped, before it bumps. */
+const BUMP_HOLD_MS = 1000;
 /** How long the mole shows it hurt after bumping into a wall. */
 const OUCH_SECONDS = 1;
 const OVERLAY_DELAY_MS = 900;
@@ -96,9 +96,11 @@ export function startGame({
   const otherPointers = new Set<number>();
   /** The cell the driving finger is on, kept while the finger stays near it. */
   let fingerCell: Cell | null = null;
-  /** Whether the driving finger is pushing into a wall; it bumps once per push. */
+  /** Whether the driving finger is pushing into a wall; it bumps at most once per push. */
   let pushingWall = false;
-  let lastBumpAt = -Infinity;
+  /** Since when the vehicle has stood still while the finger pushes into a wall. */
+  let stuckSince: number | null = null;
+  let bumped = false;
   /** When, in seconds on the animation clock, the mole last bumped into a wall. */
   let ouchAt = -Infinity;
   let overlayTimer = 0;
@@ -189,10 +191,10 @@ export function startGame({
   function steer(event: PointerEvent): boolean {
     const target = reachableCell(event, fingerCell);
     if (!target) {
-      bumpIntoWall(event);
+      notePushingWall(event);
       return false;
     }
-    pushingWall = false;
+    stopPushing();
     fingerCell = target;
     activeHasSteered = true;
     const path = findPath(maze, current, target);
@@ -204,21 +206,38 @@ export function startGame({
   }
 
   /**
-   * Plays a bump when the driving finger leaves its cell through a wall or off the maze.
-   * A finger that merely runs ahead along an open tunnel gets no bump.
+   * Notes when the driving finger leaves its cell through a wall or off the maze.
+   * A finger that merely runs ahead along an open tunnel is not pushing into a wall.
    */
-  function bumpIntoWall(event: PointerEvent): void {
+  function notePushingWall(event: PointerEvent): void {
     if (!fingerCell || pushingWall) return;
     const from = fingerCell;
     const cell = cellAt(event, from);
     const throughWall = !cell || (!sameCell(cell, from) && !neighbors(maze, from).some((next) => sameCell(next, cell)));
     if (!throughWall) return;
     pushingWall = true;
-    const now = performance.now();
-    if (now - lastBumpAt < BUMP_INTERVAL_MS) return;
-    lastBumpAt = now;
+  }
+
+  /**
+   * Bumps once the finger has kept pushing into a wall for a while with the vehicle stopped,
+   * so brushing a wall on the way round a corner does not set it off.
+   */
+  function bumpWhenStuck(now: number): void {
+    if (!pushingWall || moving) {
+      stuckSince = null;
+      return;
+    }
+    stuckSince ??= now;
+    if (bumped || now - stuckSince < BUMP_HOLD_MS) return;
+    bumped = true;
     playBump();
     ouchAt = now / 1000;
+  }
+
+  function stopPushing(): void {
+    pushingWall = false;
+    stuckSince = null;
+    bumped = false;
   }
 
   function drive(event: PointerEvent): void {
@@ -227,7 +246,7 @@ export function startGame({
     activePointer = event.pointerId;
     activeHasSteered = false;
     fingerCell = null;
-    pushingWall = false;
+    stopPushing();
     steer(event);
   }
 
@@ -235,6 +254,7 @@ export function startGame({
     activePointer = null;
     otherPointers.clear();
     fingerCell = null;
+    stopPushing();
   }
 
   function arrive(cell: Cell): void {
@@ -501,6 +521,7 @@ export function startGame({
   let last = performance.now();
   const frame = (now: number): void => {
     update(Math.min((now - last) / 1000, 0.05));
+    bumpWhenStuck(now);
     last = now;
     render(now / 1000);
     requestAnimationFrame(frame);
