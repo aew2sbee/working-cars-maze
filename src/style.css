@@ -127,6 +127,48 @@ body {
   outline-offset: 4px;
 }
 
+/* Sits in the sky above the grass, clear of the maze, so driving does not press it by accident. */
+.sleep {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 6px);
+  right: calc(env(safe-area-inset-right) + 10px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: clamp(40px, calc(10vh - 18px), 58px);
+  padding: 0 18px 0 12px;
+  border: 4px solid var(--ink);
+  border-radius: 999px;
+  background: #30477f;
+  box-shadow: 0 4px 0 var(--ink);
+  color: #fff4b0;
+  font: inherit;
+  font-size: clamp(15px, 2.8vh, 22px);
+  font-weight: 800;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.sleep[hidden] {
+  display: none;
+}
+
+.sleep svg {
+  width: 1.4em;
+  height: 1.4em;
+  fill: currentColor;
+}
+
+.sleep:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.sleep:focus-visible {
+  outline: 4px solid #fff;
+  outline-offset: 3px;
+}
+
 /* The select screen is the same cutaway as the maze: sky, a strip of grass, then soil. */
 .select {
   position: fixed;
@@ -370,10 +412,11 @@ body {
   outline-offset: 2px;
 }
 
+/* Top left, out of the way of the "おやすみ" button on the right. */
 .preview-badge {
   position: fixed;
   top: calc(env(safe-area-inset-top) + 6px);
-  right: calc(env(safe-area-inset-right) + 8px);
+  left: calc(env(safe-area-inset-left) + 8px);
   padding: 2px 8px;
   border-radius: 6px;
   background: rgba(58, 34, 19, 0.75);

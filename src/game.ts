@@ -48,6 +48,8 @@ interface Elements {
   overlay: HTMLElement;
   againButton: HTMLButtonElement;
   changeButton: HTMLButtonElement;
+  /** Lets the child end play and go to bed in the middle of a maze. */
+  sleepButton: HTMLButtonElement;
   safeArea: HTMLElement;
   lock: Parameters<typeof setupLockScreen>[0];
 }
@@ -65,6 +67,7 @@ export function startGame({
   overlay,
   againButton,
   changeButton,
+  sleepButton,
   safeArea,
   lock: lockElements,
 }: Elements): void {
@@ -144,6 +147,7 @@ export function startGame({
     hasMoved = false;
     ouchAt = -Infinity;
     phase = 'play';
+    sleepButton.hidden = false;
     particles = [];
     clearTimeout(overlayTimer);
     overlay.hidden = true;
@@ -272,6 +276,7 @@ export function startGame({
 
   function celebrate(): void {
     phase = 'clear';
+    sleepButton.hidden = true;
     // All smiles at the treasure, even right after a bump.
     ouchAt = -Infinity;
     route = [];
@@ -389,6 +394,7 @@ export function startGame({
 
   function lock(): void {
     phase = 'locked';
+    sleepButton.hidden = true;
     play.locked = true;
     save();
     route = [];
@@ -408,6 +414,7 @@ export function startGame({
 
   function showSelect(): void {
     phase = 'select';
+    sleepButton.hidden = true;
     clearTimeout(overlayTimer);
     overlay.hidden = true;
     selectScreen.hidden = false;
@@ -490,6 +497,8 @@ export function startGame({
     newMaze();
   });
   changeButton.addEventListener('click', showSelect);
+  // Going to bed is the same as running out of time: an adult unlocks the next session.
+  sleepButton.addEventListener('click', lock);
   window.addEventListener('resize', () => {
     resize();
     if (phase === 'select') drawVehiclePictures();
