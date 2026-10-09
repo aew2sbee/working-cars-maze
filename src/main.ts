@@ -23,6 +23,7 @@ startGame({
   safeArea: document.querySelector<HTMLElement>('.safe-area')!,
   lock: {
     screen: document.querySelector<HTMLElement>('#lock')!,
+    title: document.querySelector<HTMLElement>('#lock-title')!,
     adultButton: document.querySelector<HTMLButtonElement>('#adult')!,
     gate: document.querySelector<HTMLElement>('#gate')!,
     question: document.querySelector<HTMLElement>('#gate-question')!,

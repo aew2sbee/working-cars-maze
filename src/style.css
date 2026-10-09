@@ -234,6 +234,8 @@ body {
 
 .lock__title {
   position: absolute;
+  /* Focused only so it is read out; it is not a control. */
+  outline: none;
   top: calc(env(safe-area-inset-top) + 8vh);
   left: 0;
   right: 0;
