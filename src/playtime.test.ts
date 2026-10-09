@@ -7,6 +7,7 @@ import {
   loadPlayState,
   makeProblem,
   PLAY_LIMIT_MS,
+  savedPlayState,
   savePlayState,
 } from './playtime';
 import { mulberry32 } from './random';
@@ -60,7 +61,8 @@ function memoryStorage(): Storage {
 describe('play state storage', () => {
   it('keeps the lock and the time across a reload', () => {
     const storage = memoryStorage();
-    savePlayState(storage, 'p:', { elapsedMs: 1234, locked: true, lastRoundFrom: null });
+    const saved = savePlayState(storage, 'p:', { elapsedMs: 1234, locked: true, lastRoundFrom: null });
+    expect(saved).toBe(savedPlayState(storage, 'p:'));
     expect(loadPlayState(storage, 'p:')).toEqual({ elapsedMs: 1234, locked: true, lastRoundFrom: null });
   });
 
@@ -88,7 +90,8 @@ describe('play state storage', () => {
 
   it('does not throw when storage refuses to save', () => {
     const full = { setItem: () => { throw new Error('QuotaExceededError'); } };
-    expect(() => savePlayState(full, 'p:', { elapsedMs: 1, locked: false, lastRoundFrom: null })).not.toThrow();
+    expect(savePlayState(full, 'p:', { elapsedMs: 1, locked: false, lastRoundFrom: null })).toBeNull();
+    expect(savePlayState(undefined, 'p:', { elapsedMs: 1, locked: false, lastRoundFrom: null })).toBeNull();
   });
 });
 

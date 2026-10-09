@@ -25,7 +25,15 @@ import {
   type Cell,
   type Maze,
 } from './maze';
-import { bedtime, limitsFromQuery, loadPlayState, savePlayState, type PlayState } from './playtime';
+import {
+  bedtime,
+  limitsFromQuery,
+  parsePlayState,
+  playStateKey,
+  savedPlayState,
+  savePlayState,
+  type PlayState,
+} from './playtime';
 import { drawSleepingMole, drawVehicle, VEHICLES, type VehicleId } from './vehicles';
 
 /** Driving speed in cells per second. */
@@ -398,7 +406,9 @@ export function startGame({
     }
   })();
   const limits = limitsFromQuery(location.search, isPreview || import.meta.env.DEV);
-  let play: PlayState = loadPlayState(storage, storagePrefix);
+  /** The state as this tab last saved or read it; anything else in storage was saved by another tab. */
+  let known = savedPlayState(storage, storagePrefix);
+  let play: PlayState = parsePlayState(known);
   /** Whether "あと いっかい" goes back to the select screen, rather than straight into a new maze. */
   let askedFromSelect = true;
   let lastTick = performance.now();
@@ -407,7 +417,34 @@ export function startGame({
 
   function save(): void {
     ticksSinceSave = 0;
-    savePlayState(storage, storagePrefix, play);
+    known = savePlayState(storage, storagePrefix, play) ?? known;
+  }
+
+  /**
+   * Saves this tab's count, unless another tab has saved since. Then that tab's state wins,
+   * so a tab left open in the background cannot write back an old, unlocked state.
+   * Returns whether it took another tab's state.
+   */
+  function sync(): boolean {
+    if (adopt(savedPlayState(storage, storagePrefix))) return true;
+    save();
+    return false;
+  }
+
+  /** Takes over a state another tab saved, locking or unlocking to match. Returns whether it did. */
+  function adopt(saved: string | null): boolean {
+    if (saved === null || saved === known) return false;
+    known = saved;
+    play = parsePlayState(saved);
+    ticksSinceSave = 0;
+    if (play.locked && phase !== 'locked') lock();
+    else if (!play.locked && (phase === 'locked' || (phase === 'ask' && bedtime(play, false, limits) === 'play'))) {
+      // Unlocked by an adult, or "あと いっかい" chosen, in the other tab.
+      lockScreen.hide();
+      oneMore.dialog.hidden = true;
+      showSelect();
+    }
+    return true;
   }
 
   function countPlayTime(): void {
@@ -417,7 +454,8 @@ export function startGame({
     lastTick = now;
     if (document.hidden || phase === 'locked') return;
     play.elapsedMs += delta;
-    if (++ticksSinceSave >= SAVE_EVERY_TICKS) save();
+    // Another tab's state, once taken, has already locked or unlocked this tab to match.
+    if (++ticksSinceSave >= SAVE_EVERY_TICKS && sync()) return;
     // The celebration decides for itself once it ends, so the question is not skipped.
     if (phase !== 'cheer') checkBedtime(phase === 'play');
   }
@@ -587,9 +625,14 @@ export function startGame({
   window.setInterval(countPlayTime, TICK_MS);
   document.addEventListener('visibilitychange', () => {
     lastTick = performance.now();
-    if (document.hidden) save();
+    if (document.hidden) sync();
+    else adopt(savedPlayState(storage, storagePrefix));
   });
-  window.addEventListener('pagehide', save);
+  window.addEventListener('pagehide', sync);
+  // Another tab locked or unlocked: follow it at once, even while this tab is in the background.
+  window.addEventListener('storage', (event) => {
+    if (event.key === playStateKey(storagePrefix)) adopt(event.newValue);
+  });
 
   // A maze sits behind the select screen so the canvas always has something to draw.
   newMaze();
