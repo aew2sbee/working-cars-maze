@@ -263,6 +263,129 @@ body {
   outline-offset: 4px;
 }
 
+/* Asked once time is up: a sleepy mole, then one more maze or bed. */
+.one-more {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 16px) calc(env(safe-area-inset-right) + 16px)
+    calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px);
+  background: rgba(22, 34, 74, 0.55);
+}
+
+.one-more[hidden] {
+  display: none;
+}
+
+.one-more__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 2vh, 20px);
+  width: min(640px, 100%);
+  box-sizing: border-box;
+  max-height: 100%;
+  overflow: auto;
+  padding: clamp(16px, 3vh, 28px) 20px;
+  border: 6px solid var(--ink);
+  border-radius: 32px;
+  background: #fff3cf;
+  box-shadow: 0 8px 0 var(--ink);
+  color: var(--ink);
+  animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.one-more__picture {
+  width: min(260px, 60%);
+  aspect-ratio: 2 / 1;
+  max-height: 18vh;
+}
+
+.one-more__title {
+  margin: 0;
+  font-size: clamp(20px, 4.4vw, 30px);
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.one-more__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px 20px;
+}
+
+/* Narrower than .again on its own so both fit side by side, or each on one line on a phone. */
+.one-more__buttons button {
+  padding: 0 28px;
+  white-space: nowrap;
+}
+
+.one-more__sleep {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 96px;
+  border: 6px solid var(--ink);
+  border-radius: 999px;
+  background: #30477f;
+  box-shadow: 0 8px 0 var(--ink);
+  color: #fff4b0;
+  font: inherit;
+  font-size: clamp(28px, 6vw, 40px);
+  font-weight: 800;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.one-more__sleep svg {
+  width: 1.2em;
+  height: 1.2em;
+  fill: currentColor;
+}
+
+.one-more__sleep:active {
+  transform: translateY(6px);
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+.one-more__sleep:focus-visible {
+  outline: 6px solid #fff;
+  outline-offset: 4px;
+}
+
+/* Phones held sideways: smaller pieces so the whole card fits without scrolling. */
+@media (max-height: 520px) {
+  .one-more__title {
+    font-size: clamp(18px, 5vh, 26px);
+  }
+
+  .one-more__buttons button {
+    min-height: 64px;
+    font-size: clamp(22px, 6.5vh, 30px);
+  }
+}
+
+/* Small phones (an iPhone SE is 320px wide): smaller words and buttons so each line fits. */
+@media (max-width: 360px) {
+  .one-more__card {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .one-more__title {
+    font-size: 18px;
+  }
+
+  .one-more__buttons button {
+    padding: 0 18px;
+    font-size: 24px;
+  }
+}
+
 /* Lock screen: the burrow is drawn on the canvas; this layer only holds the words and buttons. */
 .lock {
   position: fixed;
@@ -433,7 +556,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .clear__title {
+  .clear__title,
+  .one-more__card {
     animation: none;
   }
 }

@@ -22,6 +22,12 @@ startGame({
   changeButton: document.querySelector<HTMLButtonElement>('#change')!,
   sleepButton: document.querySelector<HTMLButtonElement>('#sleep')!,
   safeArea: document.querySelector<HTMLElement>('.safe-area')!,
+  oneMore: {
+    dialog: document.querySelector<HTMLElement>('#one-more')!,
+    picture: document.querySelector<HTMLCanvasElement>('#one-more-picture')!,
+    yesButton: document.querySelector<HTMLButtonElement>('#one-more-yes')!,
+    noButton: document.querySelector<HTMLButtonElement>('#one-more-no')!,
+  },
   lock: {
     screen: document.querySelector<HTMLElement>('#lock')!,
     adultButton: document.querySelector<HTMLButtonElement>('#adult')!,

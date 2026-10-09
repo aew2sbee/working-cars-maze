@@ -2,13 +2,15 @@
 
 /** Total play time before the game locks. */
 export const PLAY_LIMIT_MS = 25 * 60_000;
-/** Extra time to finish the maze in progress before locking anyway. */
+/** Extra time to finish the maze in progress, or the one more maze, before locking anyway. */
 export const GRACE_MS = 5 * 60_000;
 
 export interface PlayState {
   /** Play time counted so far, only while the screen was showing. */
   elapsedMs: number;
   locked: boolean;
+  /** When time ran out and "あと いっかい" was chosen, the play time at that moment. */
+  lastRoundFrom: number | null;
 }
 
 export interface Limits {
@@ -19,12 +21,19 @@ export interface Limits {
 export const DEFAULT_LIMITS: Limits = { limitMs: PLAY_LIMIT_MS, graceMs: GRACE_MS };
 
 /**
- * Whether to lock right now. A maze in progress may be finished first,
- * but only within the grace period.
+ * What time being up means right now: nothing yet, ask whether to play one more maze, or lock.
+ * A maze in progress may be finished first, and so may the one more maze, each within the grace period.
  */
-export function shouldLock(elapsedMs: number, inMaze: boolean, limits: Limits = DEFAULT_LIMITS): boolean {
-  if (elapsedMs < limits.limitMs) return false;
-  return !inMaze || elapsedMs >= limits.limitMs + limits.graceMs;
+export function bedtime(
+  { elapsedMs, lastRoundFrom }: Pick<PlayState, 'elapsedMs' | 'lastRoundFrom'>,
+  inMaze: boolean,
+  limits: Limits = DEFAULT_LIMITS,
+): 'play' | 'ask' | 'lock' {
+  if (elapsedMs < limits.limitMs) return 'play';
+  if (lastRoundFrom !== null) return elapsedMs >= lastRoundFrom + limits.graceMs ? 'lock' : 'play';
+  // The question waits for a button however long it takes; only a maze in progress runs out.
+  if (!inMaze) return 'ask';
+  return elapsedMs >= limits.limitMs + limits.graceMs ? 'lock' : 'play';
 }
 
 const KEY = 'playtime';
@@ -34,12 +43,14 @@ export function loadPlayState(storage: Pick<Storage, 'getItem'> | undefined, pre
   try {
     const saved = JSON.parse(storage?.getItem(prefix + KEY) ?? 'null') as Partial<PlayState> | null;
     const elapsedMs = Number(saved?.elapsedMs);
+    const lastRoundFrom = saved?.lastRoundFrom;
     return {
       elapsedMs: Number.isFinite(elapsedMs) && elapsedMs > 0 ? elapsedMs : 0,
       locked: saved?.locked === true,
+      lastRoundFrom: typeof lastRoundFrom === 'number' && Number.isFinite(lastRoundFrom) ? lastRoundFrom : null,
     };
   } catch {
-    return { elapsedMs: 0, locked: false };
+    return { elapsedMs: 0, locked: false, lastRoundFrom: null };
   }
 }
 
