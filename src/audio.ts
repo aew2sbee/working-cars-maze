@@ -88,3 +88,10 @@ export function playFanfare(): void {
     tone(frequency, i * 0.13, i === notes.length - 1 ? 0.6 : 0.16, 'square', 0.05);
   });
 }
+
+/** A short "ぴろりん" for a treasure found while more are still hidden; the fanfare waits for the last one. */
+export function playChime(): void {
+  [880, 1174.66, 1567.98].forEach((frequency, i) => {
+    tone(frequency, i * 0.07, i === 2 ? 0.35 : 0.1, 'triangle', 0.12);
+  });
+}

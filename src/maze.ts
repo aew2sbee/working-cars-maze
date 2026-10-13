@@ -139,24 +139,41 @@ export function distancesFrom(maze: Maze, from: Cell): Int32Array {
   return distance;
 }
 
+export const MAX_TREASURES = 3;
+/** Mazes to clear before each extra treasure. */
+export const CLEARS_PER_TREASURE = 3;
+
+/** One treasure to start with, one more every few mazes cleared, up to MAX_TREASURES. */
+export function treasureCount(cleared: number): number {
+  return Math.min(MAX_TREASURES, 1 + Math.floor(cleared / CLEARS_PER_TREASURE));
+}
+
 /**
- * Picks a dead end for the treasure, so the goal is somewhere new each time.
- * Only dead ends at least half as far as the farthest one count, so the way is never trivially short.
+ * Picks dead ends for the treasures, so they are somewhere new each time.
+ * Dead ends at least half as far as the farthest one come first, so the way is never trivially short;
+ * a maze without enough of them falls back to nearer dead ends, then to any far cell.
  */
-export function pickGoal(maze: Maze, start: Cell, random: () => number = Math.random): Cell {
+export function pickTreasures(maze: Maze, start: Cell, count: number, random: () => number = Math.random): Cell[] {
   const distance = distancesFrom(maze, start);
-  const deadEnds: { cell: Cell; steps: number }[] = [];
+  const cells: { cell: Cell; steps: number; deadEnd: boolean }[] = [];
   for (let row = 0; row < maze.rows; row++) {
     for (let col = 0; col < maze.cols; col++) {
       const cell = { col, row };
-      if (!sameCell(cell, start) && neighbors(maze, cell).length === 1) {
-        deadEnds.push({ cell, steps: distance[row * maze.cols + col] });
-      }
+      if (sameCell(cell, start)) continue;
+      cells.push({ cell, steps: distance[row * maze.cols + col], deadEnd: neighbors(maze, cell).length === 1 });
     }
   }
-  const farthest = Math.max(...deadEnds.map((end) => end.steps));
-  const candidates = deadEnds.filter((end) => end.steps * 2 >= farthest);
-  return candidates[Math.floor(random() * candidates.length)].cell;
+  const farthest = Math.max(...cells.filter((c) => c.deadEnd).map((c) => c.steps));
+  const far = cells.filter((c) => c.deadEnd && c.steps * 2 >= farthest);
+  const picked: Cell[] = [];
+  while (picked.length < count && far.length > 0) {
+    picked.push(far.splice(Math.floor(random() * far.length), 1)[0].cell);
+  }
+  const rest = cells
+    .filter((c) => !picked.some((cell) => sameCell(cell, c.cell)))
+    .sort((a, b) => Number(b.deadEnd) - Number(a.deadEnd) || b.steps - a.steps);
+  for (const c of rest.slice(0, count - picked.length)) picked.push(c.cell);
+  return picked;
 }
 
 /** Shortest route through open sides, including both ends. */

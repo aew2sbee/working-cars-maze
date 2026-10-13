@@ -1,6 +1,6 @@
-// Pick a vehicle, then drag a finger and it follows along the tunnels to the treasure.
+// Pick a vehicle, then drag a finger and it follows along the tunnels to the treasures.
 
-import { playBump, playFanfare, playStep, unlockAudio } from './audio';
+import { playBump, playChime, playFanfare, playStep, unlockAudio } from './audio';
 import { drawBedtime } from './bedtime';
 import {
   cellCenter,
@@ -9,6 +9,7 @@ import {
   drawHint,
   drawParticles,
   drawTreadMarks,
+  drawTreasureCount,
   type Layout,
   type Particle,
 } from './draw';
@@ -20,8 +21,9 @@ import {
   findPath,
   generateMaze,
   neighbors,
-  pickGoal,
+  pickTreasures,
   sameCell,
+  treasureCount,
   type Cell,
   type Maze,
 } from './maze';
@@ -115,7 +117,13 @@ export function startGame({
   let maze: Maze;
   let seed = 0;
   let layout: Layout;
-  let goal: Cell;
+  /** Where the treasures are, and which have been found; the maze is cleared once all are open. */
+  let treasures: Cell[] = [];
+  let opened: boolean[] = [];
+  /** Mazes cleared since the page was opened; more of them bring more treasures. */
+  let cleared = 0;
+  /** Where the row of small chests in the grass starts. */
+  let counterAt = { left: 0, top: 0 };
   let current: Cell;
   let position = { col: 0, row: 0 };
   let route: Cell[] = [];
@@ -174,7 +182,8 @@ export function startGame({
     seed = Math.floor(Math.random() * 2 ** 32);
     maze = generateMaze(cols, rows);
     current = { col: 0, row: 0 };
-    goal = pickGoal(maze, current);
+    treasures = pickTreasures(maze, current, treasureCount(cleared));
+    opened = treasures.map(() => false);
     position = { ...current };
     route = [];
     fingerCell = null;
@@ -200,6 +209,8 @@ export function startGame({
       target.height = Math.round(height * dpr);
     }
     const area = playArea(width, height);
+    const inset = insets();
+    counterAt = { left: inset.left + 16, top: inset.top };
     const cell = Math.min(area.width / maze.cols, area.height / maze.rows);
     layout = {
       width,
@@ -308,7 +319,36 @@ export function startGame({
     }
     current = cell;
     route.shift();
-    if (sameCell(current, goal)) celebrate();
+    const found = treasures.findIndex((treasure, i) => !opened[i] && sameCell(treasure, current));
+    if (found < 0) return;
+    opened[found] = true;
+    if (opened.every(Boolean)) celebrate();
+    else {
+      playChime();
+      burst(20, 0.5);
+    }
+  }
+
+  /** Confetti from the vehicle's cell; `power` scales how far it flies. */
+  function burst(count: number, power: number): void {
+    if (reduceMotion.matches) return;
+    const { x, y } = cellCenter(layout, current);
+    particles.push(
+      ...Array.from({ length: count }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (250 + Math.random() * 450) * power;
+        return {
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 300 * power,
+          spin: (Math.random() - 0.5) * 10,
+          angle: Math.random() * Math.PI,
+          size: 6 + Math.random() * 9,
+          color: CONFETTI[Math.floor(Math.random() * CONFETTI.length)],
+        };
+      }),
+    );
   }
 
   function celebrate(): void {
@@ -319,28 +359,13 @@ export function startGame({
     route = [];
     releasePointers();
     playFanfare();
+    cleared++;
     // That was the one more maze: lock now, so a reload during the celebration cannot skip it.
     if (play.lastRoundFrom !== null) {
       play.locked = true;
       save();
     }
-    if (!reduceMotion.matches) {
-      const { x, y } = cellCenter(layout, goal);
-      particles = Array.from({ length: 70 }, () => {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 250 + Math.random() * 450;
-        return {
-          x,
-          y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 300,
-          spin: (Math.random() - 0.5) * 10,
-          angle: Math.random() * Math.PI,
-          size: 6 + Math.random() * 9,
-          color: CONFETTI[Math.floor(Math.random() * CONFETTI.length)],
-        };
-      });
-    }
+    burst(70, 1);
     overlayTimer = window.setTimeout(() => {
       if (play.locked) {
         lock();
@@ -386,9 +411,14 @@ export function startGame({
     ctx.drawImage(background, 0, 0, layout.width, layout.height);
     drawTreadMarks(ctx, layout, tracks);
 
-    const chest = cellCenter(layout, goal);
-    const found = phase === 'cheer' || phase === 'clear';
-    if (!found) drawChest(ctx, chest.x, chest.y, layout.cell * 0.6, time, false);
+    const done = phase === 'cheer' || phase === 'clear';
+    const chestSize = layout.cell * 0.6;
+    // Chests found on the way stay open where they were; the last one is drawn after the vehicle.
+    treasures.forEach((treasure, i) => {
+      if (done && sameCell(treasure, current)) return;
+      const chest = cellCenter(layout, treasure);
+      drawChest(ctx, chest.x, chest.y, chestSize, time, opened[i], !opened[i]);
+    });
 
     const driver = cellCenter(layout, position);
     const size = layout.cell * 0.78;
@@ -399,9 +429,10 @@ export function startGame({
     const shake = reduceMotion.matches ? 0 : Math.sin(time * 70) * size * 0.04 * ouch ** 2;
     drawVehicle(ctx, vehicle, driver.x + wiggle + shake, driver.y, size, facing, bob, true, ouch);
 
-    // Once found, the open chest pops up above the vehicle instead of hiding under it.
-    if (found) drawChest(ctx, chest.x, chest.y - layout.cell * 0.45, layout.cell * 0.6, time, true);
+    // Once the last one is found, the open chest pops up above the vehicle instead of hiding under it.
+    if (done) drawChest(ctx, driver.x, driver.y - layout.cell * 0.45, chestSize, time, true);
 
+    drawTreasureCount(ctx, layout, counterAt.left, counterAt.top, opened);
     drawParticles(ctx, particles);
   }
 
@@ -622,7 +653,19 @@ export function startGame({
     // Lets automated checks drive a finger along the solution; not in production builds.
     Object.assign(window, {
       __maze: {
-        solution: () => findPath(maze, current, goal).map((cell) => cellCenter(layout, cell)),
+        /** A way past every treasure still hidden, nearest first. */
+        solution: () => {
+          const left = treasures.filter((_, i) => !opened[i]);
+          const path = [current];
+          while (left.length > 0) {
+            const from = path[path.length - 1];
+            const legs = left.map((treasure) => findPath(maze, from, treasure));
+            const nearest = legs.reduce((best, leg, i) => (leg.length < legs[best].length ? i : best), 0);
+            path.push(...legs[nearest].slice(1));
+            left.splice(nearest, 1);
+          }
+          return path.map((cell) => cellCenter(layout, cell));
+        },
         phase: () => phase,
         play: () => ({ ...play }),
         setElapsed: (ms: number) => void (play.elapsedMs = ms),
