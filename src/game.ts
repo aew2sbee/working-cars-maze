@@ -10,6 +10,7 @@ import {
   drawParticles,
   drawTreadMarks,
   drawTreasureCount,
+  drawTwinkles,
   type Layout,
   type Particle,
 } from './draw';
@@ -117,13 +118,10 @@ export function startGame({
   let maze: Maze;
   let seed = 0;
   let layout: Layout;
-  /** Where the treasures are, and which have been found; the maze is cleared once all are open. */
-  let treasures: Cell[] = [];
-  let opened: boolean[] = [];
+  /** The maze is cleared once every treasure is open. */
+  let treasures: { cell: Cell; open: boolean }[] = [];
   /** Mazes cleared since the page was opened; more of them bring more treasures. */
   let cleared = 0;
-  /** Where the row of small chests in the grass starts. */
-  let counterAt = { left: 0, top: 0 };
   let current: Cell;
   let position = { col: 0, row: 0 };
   let route: Cell[] = [];
@@ -169,6 +167,7 @@ export function startGame({
     const pad = 16;
     return {
       groundY,
+      skyTop: inset.top,
       left: inset.left + pad,
       top: groundY + pad,
       width: width - inset.left - inset.right - pad * 2,
@@ -182,8 +181,7 @@ export function startGame({
     seed = Math.floor(Math.random() * 2 ** 32);
     maze = generateMaze(cols, rows);
     current = { col: 0, row: 0 };
-    treasures = pickTreasures(maze, current, treasureCount(cleared));
-    opened = treasures.map(() => false);
+    treasures = pickTreasures(maze, current, treasureCount(cleared)).map((cell) => ({ cell, open: false }));
     position = { ...current };
     route = [];
     fingerCell = null;
@@ -209,13 +207,13 @@ export function startGame({
       target.height = Math.round(height * dpr);
     }
     const area = playArea(width, height);
-    const inset = insets();
-    counterAt = { left: inset.left + 16, top: inset.top };
     const cell = Math.min(area.width / maze.cols, area.height / maze.rows);
     layout = {
       width,
       height,
       groundY: area.groundY,
+      skyTop: area.skyTop,
+      left: area.left,
       cell,
       originX: area.left + (area.width - cell * maze.cols) / 2,
       originY: area.top + (area.height - cell * maze.rows) / 2,
@@ -319,10 +317,10 @@ export function startGame({
     }
     current = cell;
     route.shift();
-    const found = treasures.findIndex((treasure, i) => !opened[i] && sameCell(treasure, current));
-    if (found < 0) return;
-    opened[found] = true;
-    if (opened.every(Boolean)) celebrate();
+    const found = treasures.find((treasure) => !treasure.open && sameCell(treasure.cell, current));
+    if (!found) return;
+    found.open = true;
+    if (treasures.every((treasure) => treasure.open)) celebrate();
     else {
       playChime();
       burst(20, 0.5);
@@ -414,11 +412,12 @@ export function startGame({
     const done = phase === 'cheer' || phase === 'clear';
     const chestSize = layout.cell * 0.6;
     // Chests found on the way stay open where they were; the last one is drawn after the vehicle.
-    treasures.forEach((treasure, i) => {
-      if (done && sameCell(treasure, current)) return;
-      const chest = cellCenter(layout, treasure);
-      drawChest(ctx, chest.x, chest.y, chestSize, time, opened[i], !opened[i]);
-    });
+    for (const { cell, open } of treasures) {
+      if (done && sameCell(cell, current)) continue;
+      const chest = cellCenter(layout, cell);
+      if (!open) drawTwinkles(ctx, chest.x, chest.y, chestSize, time);
+      drawChest(ctx, chest.x, chest.y, chestSize, open);
+    }
 
     const driver = cellCenter(layout, position);
     const size = layout.cell * 0.78;
@@ -430,9 +429,13 @@ export function startGame({
     drawVehicle(ctx, vehicle, driver.x + wiggle + shake, driver.y, size, facing, bob, true, ouch);
 
     // Once the last one is found, the open chest pops up above the vehicle instead of hiding under it.
-    if (done) drawChest(ctx, driver.x, driver.y - layout.cell * 0.45, chestSize, time, true);
+    if (done) {
+      const popY = driver.y - layout.cell * 0.45;
+      drawTwinkles(ctx, driver.x, popY, chestSize, time);
+      drawChest(ctx, driver.x, popY, chestSize, true);
+    }
 
-    drawTreasureCount(ctx, layout, counterAt.left, counterAt.top, opened);
+    drawTreasureCount(ctx, layout, treasures.map((treasure) => treasure.open));
     drawParticles(ctx, particles);
   }
 
@@ -655,7 +658,7 @@ export function startGame({
       __maze: {
         /** A way past every treasure still hidden, nearest first. */
         solution: () => {
-          const left = treasures.filter((_, i) => !opened[i]);
+          const left = treasures.filter((treasure) => !treasure.open).map((treasure) => treasure.cell);
           const path = [current];
           while (left.length > 0) {
             const from = path[path.length - 1];

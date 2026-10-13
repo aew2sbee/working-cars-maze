@@ -141,7 +141,7 @@ export function distancesFrom(maze: Maze, from: Cell): Int32Array {
 
 export const MAX_TREASURES = 3;
 /** Mazes to clear before each extra treasure. */
-export const CLEARS_PER_TREASURE = 3;
+const CLEARS_PER_TREASURE = 3;
 
 /** One treasure to start with, one more every few mazes cleared, up to MAX_TREASURES. */
 export function treasureCount(cleared: number): number {
@@ -164,16 +164,17 @@ export function pickTreasures(maze: Maze, start: Cell, count: number, random: ()
     }
   }
   const farthest = Math.max(...cells.filter((c) => c.deadEnd).map((c) => c.steps));
-  const far = cells.filter((c) => c.deadEnd && c.steps * 2 >= farthest);
+  const isFar = (c: (typeof cells)[number]): boolean => c.deadEnd && c.steps * 2 >= farthest;
+  const far = cells.filter(isFar);
   const picked: Cell[] = [];
   while (picked.length < count && far.length > 0) {
     picked.push(far.splice(Math.floor(random() * far.length), 1)[0].cell);
   }
+  if (picked.length === count) return picked;
   const rest = cells
-    .filter((c) => !picked.some((cell) => sameCell(cell, c.cell)))
+    .filter((c) => !isFar(c))
     .sort((a, b) => Number(b.deadEnd) - Number(a.deadEnd) || b.steps - a.steps);
-  for (const c of rest.slice(0, count - picked.length)) picked.push(c.cell);
-  return picked;
+  return [...picked, ...rest.slice(0, count - picked.length).map((c) => c.cell)];
 }
 
 /** Shortest route through open sides, including both ends. */

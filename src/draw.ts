@@ -8,6 +8,9 @@ export interface Layout {
   height: number;
   /** Where the grass meets the soil. */
   groundY: number;
+  /** Top of the sky inside the safe area, and the left edge of the play area. */
+  skyTop: number;
+  left: number;
   cell: number;
   originX: number;
   originY: number;
@@ -194,26 +197,20 @@ export function drawTreadMarks(ctx: CanvasRenderingContext2D, layout: Layout, se
   ctx.restore();
 }
 
-export function drawChest(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  time: number,
-  open: boolean,
-  twinkle = true,
-): void {
+/** Stars circling a chest of the given size, so a treasure is easy to spot. */
+export function drawTwinkles(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, time: number): void {
+  const u = size / 100;
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + time * 0.6;
+    const scale = 0.55 + 0.45 * Math.sin(time * 3 + i * 2);
+    drawStar(ctx, x + Math.cos(angle) * 58 * u, y + Math.sin(angle) * 46 * u - 10 * u, 12 * u * scale, '#fff4b0');
+  }
+}
+
+export function drawChest(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, open: boolean): void {
   const u = size / 100;
   ctx.save();
   ctx.translate(x, y);
-
-  // Twinkles so the goal is easy to spot.
-  for (let i = 0; twinkle && i < 3; i++) {
-    const angle = (i / 3) * Math.PI * 2 + time * 0.6;
-    const scale = 0.55 + 0.45 * Math.sin(time * 3 + i * 2);
-    drawStar(ctx, Math.cos(angle) * 58 * u, Math.sin(angle) * 46 * u - 10 * u, 12 * u * scale, '#fff4b0');
-  }
-
   ctx.scale(u, u);
   ctx.lineJoin = 'round';
   ctx.strokeStyle = INK;
@@ -313,10 +310,11 @@ export function drawParticles(ctx: CanvasRenderingContext2D, particles: Particle
 }
 
 /** A row of small chests in the grass, one per treasure, opened as each is found. */
-export function drawTreasureCount(ctx: CanvasRenderingContext2D, layout: Layout, left: number, top: number, opened: boolean[]): void {
-  const size = Math.min(48, (layout.groundY - top) * 0.75);
-  const y = top + (layout.groundY - top) / 2 + size * 0.05;
+export function drawTreasureCount(ctx: CanvasRenderingContext2D, layout: Layout, opened: boolean[]): void {
+  const sky = layout.groundY - layout.skyTop;
+  const size = Math.min(48, sky * 0.75);
+  const y = layout.skyTop + sky / 2 + size * 0.05;
   opened.forEach((open, i) => {
-    drawChest(ctx, left + size * (0.6 + i * 1.15), y, size, 0, open, false);
+    drawChest(ctx, layout.left + size * (0.6 + i * 1.15), y, size, open);
   });
 }
