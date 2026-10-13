@@ -36,17 +36,34 @@ export function bedtime(
   return elapsedMs >= limits.limitMs + limits.graceMs ? 'lock' : 'play';
 }
 
-const KEY = 'playtime';
+/** The storage key, also used to spot another tab saving through the `storage` event. */
+export function playStateKey(prefix: string): string {
+  return prefix + 'playtime';
+}
 
-/** Reads the saved state; anything missing or damaged counts as a fresh start. */
-export function loadPlayState(storage: Pick<Storage, 'getItem'> | undefined, prefix: string): PlayState {
+/** The saved state exactly as stored, to tell whether another tab has saved since. */
+export function savedPlayState(storage: Pick<Storage, 'getItem'> | undefined, prefix: string): string | null {
   try {
-    const saved = JSON.parse(storage?.getItem(prefix + KEY) ?? 'null') as Partial<PlayState> | null;
-    const elapsedMs = Number(saved?.elapsedMs);
-    const lastRoundFrom = saved?.lastRoundFrom;
+    return storage?.getItem(playStateKey(prefix)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reads the state saved in storage. */
+export function loadPlayState(storage: Pick<Storage, 'getItem'> | undefined, prefix: string): PlayState {
+  return parsePlayState(savedPlayState(storage, prefix));
+}
+
+/** Reads a saved state; anything missing or damaged counts as a fresh start. */
+export function parsePlayState(saved: string | null): PlayState {
+  try {
+    const state = JSON.parse(saved ?? 'null') as Partial<PlayState> | null;
+    const elapsedMs = Number(state?.elapsedMs);
+    const lastRoundFrom = state?.lastRoundFrom;
     return {
       elapsedMs: Number.isFinite(elapsedMs) && elapsedMs > 0 ? elapsedMs : 0,
-      locked: saved?.locked === true,
+      locked: state?.locked === true,
       lastRoundFrom: typeof lastRoundFrom === 'number' && Number.isFinite(lastRoundFrom) ? lastRoundFrom : null,
     };
   } catch {
@@ -54,11 +71,16 @@ export function loadPlayState(storage: Pick<Storage, 'getItem'> | undefined, pre
   }
 }
 
-export function savePlayState(storage: Pick<Storage, 'setItem'> | undefined, prefix: string, state: PlayState): void {
+/** Saves the state and returns it as stored, or null when it could not be saved. */
+export function savePlayState(storage: Pick<Storage, 'setItem'> | undefined, prefix: string, state: PlayState): string | null {
+  if (!storage) return null;
+  const saved = JSON.stringify(state);
   try {
-    storage?.setItem(prefix + KEY, JSON.stringify(state));
+    storage.setItem(playStateKey(prefix), saved);
+    return saved;
   } catch {
     // Private mode or full storage: keep counting in memory.
+    return null;
   }
 }
 
