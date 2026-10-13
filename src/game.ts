@@ -409,7 +409,7 @@ export function startGame({
     ctx.drawImage(background, 0, 0, layout.width, layout.height);
     drawTreadMarks(ctx, layout, tracks);
 
-    const done = phase === 'cheer' || phase === 'clear';
+    const done = treasures.every((treasure) => treasure.open);
     const chestSize = layout.cell * 0.6;
     // Chests found on the way stay open where they were; the last one is drawn after the vehicle.
     for (const { cell, open } of treasures) {

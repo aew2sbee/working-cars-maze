@@ -151,7 +151,7 @@ export function treasureCount(cleared: number): number {
 /**
  * Picks dead ends for the treasures, so they are somewhere new each time.
  * Dead ends at least half as far as the farthest one come first, so the way is never trivially short;
- * a maze without enough of them falls back to nearer dead ends, then to any far cell.
+ * a maze without enough of them falls back to the farthest of the other cells.
  */
 export function pickTreasures(maze: Maze, start: Cell, count: number, random: () => number = Math.random): Cell[] {
   const distance = distancesFrom(maze, start);
@@ -173,7 +173,7 @@ export function pickTreasures(maze: Maze, start: Cell, count: number, random: ()
   if (picked.length === count) return picked;
   const rest = cells
     .filter((c) => !isFar(c))
-    .sort((a, b) => Number(b.deadEnd) - Number(a.deadEnd) || b.steps - a.steps);
+    .sort((a, b) => b.steps - a.steps);
   return [...picked, ...rest.slice(0, count - picked.length).map((c) => c.cell)];
 }
 
