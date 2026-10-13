@@ -150,8 +150,9 @@ export function treasureCount(cleared: number): number {
 
 /**
  * Picks dead ends for the treasures, so they are somewhere new each time.
- * Dead ends at least half as far as the farthest one come first, so the way is never trivially short;
- * a maze without enough of them falls back to the farthest of the other cells.
+ * Dead ends at least half as far as the farthest one come first, so the way is never trivially short.
+ * A maze without enough of them takes the cells farthest from both the start and the treasures so far,
+ * so each extra treasure needs a trip of its own rather than lying on the way to another.
  */
 export function pickTreasures(maze: Maze, start: Cell, count: number, random: () => number = Math.random): Cell[] {
   const distance = distancesFrom(maze, start);
@@ -171,10 +172,25 @@ export function pickTreasures(maze: Maze, start: Cell, count: number, random: ()
     picked.push(far.splice(Math.floor(random() * far.length), 1)[0].cell);
   }
   if (picked.length === count) return picked;
-  const rest = cells
-    .filter((c) => !isFar(c))
-    .sort((a, b) => b.steps - a.steps);
-  return [...picked, ...rest.slice(0, count - picked.length).map((c) => c.cell)];
+
+  // Steps from each cell to the nearest of the start and the treasures picked so far.
+  const away = Int32Array.from(distance);
+  const keepAwayFrom = (treasure: Cell): void => {
+    distancesFrom(maze, treasure).forEach((steps, i) => {
+      away[i] = Math.min(away[i], steps);
+    });
+  };
+  picked.forEach(keepAwayFrom);
+  const rest = cells.filter((c) => !isFar(c));
+  // Farthest away wins; between equals, a dead end.
+  const score = (c: (typeof cells)[number]): number => away[c.cell.row * maze.cols + c.cell.col] * 2 + Number(c.deadEnd);
+  while (picked.length < count && rest.length > 0) {
+    const best = rest.reduce((top, c, i) => (score(c) > score(rest[top]) ? i : top), 0);
+    const { cell } = rest.splice(best, 1)[0];
+    picked.push(cell);
+    keepAwayFrom(cell);
+  }
+  return picked;
 }
 
 /** Shortest route through open sides, including both ends. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellAtPoint, chooseGrid, distancesFrom, E, findPath, MAX_TREASURES, MIN_CELL, TARGET_CELLS, generateMaze, isOpen, neighbors, pickTreasures, S, sameCell, treasureCount } from './maze';
+import { cellAtPoint, chooseGrid, distancesFrom, E, findPath, MAX_TREASURES, MIN_CELL, N, TARGET_CELLS, generateMaze, isOpen, neighbors, pickTreasures, S, sameCell, treasureCount, W } from './maze';
 import { mulberry32 } from './random';
 
 const sizes: [number, number][] = [
@@ -84,14 +84,27 @@ describe('pickTreasures', () => {
     }
   });
 
-  it('falls back to other cells when the maze has too few dead ends', () => {
-    // A single corridor 0,0 → 3,0: the only dead end besides the start is the far end.
-    const maze = generateMaze(4, 1, mulberry32(1));
-    const treasures = pickTreasures(maze, { col: 0, row: 0 }, 3, mulberry32(2));
-    expect(treasures).toEqual([
-      { col: 3, row: 0 },
+  it('spreads extra treasures away from the others when the maze has too few far dead ends', () => {
+    // S ─ a ─ b ─ c       Only F is a far dead end. The next picks keep away from both S and F:
+    // │   │       │       the side branch d, then b, rather than c and e on the way to F.
+    // x   d   F ─ e
+    const open = new Uint8Array(8);
+    const link = (from: number, side: number, to: number, back: number): void => {
+      open[from] |= side;
+      open[to] |= back;
+    };
+    link(0, E, 1, W); // S ─ a
+    link(1, E, 2, W); // a ─ b
+    link(2, E, 3, W); // b ─ c
+    link(3, S, 7, N); // c ─ e
+    link(7, W, 6, E); // e ─ F
+    link(0, S, 4, N); // S ─ x
+    link(1, S, 5, N); // a ─ d
+    const maze = { cols: 4, rows: 2, open };
+    expect(pickTreasures(maze, { col: 0, row: 0 }, 3, mulberry32(1))).toEqual([
+      { col: 2, row: 1 },
+      { col: 1, row: 1 },
       { col: 2, row: 0 },
-      { col: 1, row: 0 },
     ]);
   });
 });
