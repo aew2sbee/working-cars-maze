@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellAtPoint, chooseGrid, distancesFrom, E, findPath, MIN_CELL, TARGET_CELLS, generateMaze, isOpen, neighbors, pickGoal, S, sameCell } from './maze';
+import { cellAtPoint, chooseGrid, distancesFrom, E, findPath, MAX_TREASURES, MIN_CELL, N, TARGET_CELLS, generateMaze, isOpen, neighbors, pickTreasures, S, sameCell, treasureCount, W } from './maze';
 import { mulberry32 } from './random';
 
 const sizes: [number, number][] = [
@@ -42,13 +42,19 @@ describe('generateMaze', () => {
   });
 });
 
-describe('pickGoal', () => {
-  it.each(sizes)('%i x %i puts the goal at a far dead end, not the start', (cols, rows) => {
+describe('treasureCount', () => {
+  it('adds a treasure every three mazes cleared, up to three', () => {
+    expect([0, 1, 2, 3, 5, 6, 8, 9, 100].map(treasureCount)).toEqual([1, 1, 1, 2, 2, 3, 3, 3, 3]);
+  });
+});
+
+describe('pickTreasures', () => {
+  it.each(sizes)('%i x %i puts the treasure at a far dead end, not the start', (cols, rows) => {
     const start = { col: 0, row: 0 };
     const goals = new Set<string>();
     for (let seed = 1; seed <= 30; seed++) {
       const maze = generateMaze(cols, rows, mulberry32(seed));
-      const goal = pickGoal(maze, start, mulberry32(seed + 1000));
+      const [goal] = pickTreasures(maze, start, 1, mulberry32(seed + 1000));
       const distance = distancesFrom(maze, start);
       const deadEndSteps = [];
       for (let i = 0; i < cols * rows; i++) {
@@ -63,6 +69,43 @@ describe('pickGoal', () => {
     }
     // Not always the same corner.
     expect(goals.size).toBeGreaterThan(1);
+  });
+
+  it.each(sizes)('%i x %i finds as many different treasures as asked, never at the start', (cols, rows) => {
+    const start = { col: 0, row: 0 };
+    for (let seed = 1; seed <= 30; seed++) {
+      const maze = generateMaze(cols, rows, mulberry32(seed));
+      for (let count = 1; count <= MAX_TREASURES; count++) {
+        const treasures = pickTreasures(maze, start, count, mulberry32(seed + 1000));
+        expect(treasures).toHaveLength(count);
+        expect(new Set(treasures.map((cell) => `${cell.col},${cell.row}`)).size).toBe(count);
+        expect(treasures.some((cell) => sameCell(cell, start))).toBe(false);
+      }
+    }
+  });
+
+  it('spreads extra treasures away from the others when the maze has too few far dead ends', () => {
+    // S ─ a ─ b ─ c       Only F is a far dead end. The next picks keep away from both S and F:
+    // │   │       │       the side branch d, then b, rather than c and e on the way to F.
+    // x   d   F ─ e
+    const open = new Uint8Array(8);
+    const link = (from: number, side: number, to: number, back: number): void => {
+      open[from] |= side;
+      open[to] |= back;
+    };
+    link(0, E, 1, W); // S ─ a
+    link(1, E, 2, W); // a ─ b
+    link(2, E, 3, W); // b ─ c
+    link(3, S, 7, N); // c ─ e
+    link(7, W, 6, E); // e ─ F
+    link(0, S, 4, N); // S ─ x
+    link(1, S, 5, N); // a ─ d
+    const maze = { cols: 4, rows: 2, open };
+    expect(pickTreasures(maze, { col: 0, row: 0 }, 3, mulberry32(1))).toEqual([
+      { col: 2, row: 1 },
+      { col: 1, row: 1 },
+      { col: 2, row: 0 },
+    ]);
   });
 });
 
