@@ -320,11 +320,15 @@ export function startGame({
     const found = treasures.find((treasure) => !treasure.open && sameCell(treasure.cell, current));
     if (!found) return;
     found.open = true;
-    if (treasures.every((treasure) => treasure.open)) celebrate();
+    if (allFound()) celebrate();
     else {
       playChime();
       burst(20, 0.5);
     }
+  }
+
+  function allFound(): boolean {
+    return treasures.every((treasure) => treasure.open);
   }
 
   /** Confetti from the vehicle's cell; `power` scales how far it flies. */
@@ -409,7 +413,7 @@ export function startGame({
     ctx.drawImage(background, 0, 0, layout.width, layout.height);
     drawTreadMarks(ctx, layout, tracks);
 
-    const done = treasures.every((treasure) => treasure.open);
+    const done = allFound();
     const chestSize = layout.cell * 0.6;
     // Chests found on the way stay open where they were; the last one is drawn after the vehicle.
     for (const { cell, open } of treasures) {
