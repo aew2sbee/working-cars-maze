@@ -24,7 +24,7 @@ import {
   neighbors,
   pickTreasures,
   sameCell,
-  treasureCount,
+  TREASURES,
   type Cell,
   type Maze,
 } from './maze';
@@ -120,8 +120,6 @@ export function startGame({
   let layout: Layout;
   /** The maze is cleared once every treasure is open. */
   let treasures: { cell: Cell; open: boolean }[] = [];
-  /** Mazes cleared since the page was opened; more of them bring more treasures. */
-  let cleared = 0;
   let current: Cell;
   let position = { col: 0, row: 0 };
   let route: Cell[] = [];
@@ -181,7 +179,7 @@ export function startGame({
     seed = Math.floor(Math.random() * 2 ** 32);
     maze = generateMaze(cols, rows);
     current = { col: 0, row: 0 };
-    treasures = pickTreasures(maze, current, treasureCount(cleared)).map((cell) => ({ cell, open: false }));
+    treasures = pickTreasures(maze, current, TREASURES).map((cell) => ({ cell, open: false }));
     position = { ...current };
     route = [];
     fingerCell = null;
@@ -361,7 +359,6 @@ export function startGame({
     route = [];
     releasePointers();
     playFanfare();
-    cleared++;
     // That was the one more maze: lock now, so a reload during the celebration cannot skip it.
     if (play.lastRoundFrom !== null) {
       play.locked = true;

@@ -139,14 +139,8 @@ export function distancesFrom(maze: Maze, from: Cell): Int32Array {
   return distance;
 }
 
-export const MAX_TREASURES = 3;
-/** Mazes to clear before each extra treasure. */
-const CLEARS_PER_TREASURE = 3;
-
-/** One treasure to start with, one more every few mazes cleared, up to MAX_TREASURES. */
-export function treasureCount(cleared: number): number {
-  return Math.min(MAX_TREASURES, 1 + Math.floor(cleared / CLEARS_PER_TREASURE));
-}
+/** Treasures hidden in every maze; it is cleared once all of them are open. */
+export const TREASURES = 3;
 
 /**
  * Picks dead ends for the treasures, so they are somewhere new each time.

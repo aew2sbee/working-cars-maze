@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellAtPoint, chooseGrid, distancesFrom, E, findPath, MAX_TREASURES, MIN_CELL, N, TARGET_CELLS, generateMaze, isOpen, neighbors, pickTreasures, S, sameCell, treasureCount, W } from './maze';
+import { cellAtPoint, chooseGrid, distancesFrom, E, findPath, MIN_CELL, N, TARGET_CELLS, TREASURES, generateMaze, isOpen, neighbors, pickTreasures, S, sameCell, W } from './maze';
 import { mulberry32 } from './random';
 
 const sizes: [number, number][] = [
@@ -42,12 +42,6 @@ describe('generateMaze', () => {
   });
 });
 
-describe('treasureCount', () => {
-  it('adds a treasure every three mazes cleared, up to three', () => {
-    expect([0, 1, 2, 3, 5, 6, 8, 9, 100].map(treasureCount)).toEqual([1, 1, 1, 2, 2, 3, 3, 3, 3]);
-  });
-});
-
 describe('pickTreasures', () => {
   it.each(sizes)('%i x %i puts the treasure at a far dead end, not the start', (cols, rows) => {
     const start = { col: 0, row: 0 };
@@ -75,7 +69,7 @@ describe('pickTreasures', () => {
     const start = { col: 0, row: 0 };
     for (let seed = 1; seed <= 30; seed++) {
       const maze = generateMaze(cols, rows, mulberry32(seed));
-      for (let count = 1; count <= MAX_TREASURES; count++) {
+      for (let count = 1; count <= TREASURES; count++) {
         const treasures = pickTreasures(maze, start, count, mulberry32(seed + 1000));
         expect(treasures).toHaveLength(count);
         expect(new Set(treasures.map((cell) => `${cell.col},${cell.row}`)).size).toBe(count);
