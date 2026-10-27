@@ -1,10 +1,11 @@
 // The lock screen picture: night has come, and the mole sleeps in its burrow next to the vehicle.
 
-import { HAT, INK } from './draw';
+import { drawGrass, drawHollow, drawStrata, HAT, INK, type Grass } from './draw';
 import { mulberry32 } from './random';
 import { drawSleepingMole, drawVehicle, type VehicleId } from './vehicles';
 
 const NIGHT_SOIL = ['#6b4a35', '#5c3f2d', '#4d3426', '#3f2a1f'];
+const NIGHT_GRASS: Grass = { strip: '#3f7d2c', back: '#336a24', front: '#4b8f36' };
 
 export function drawBedtime(ctx: CanvasRenderingContext2D, width: number, height: number, vehicle: VehicleId, time: number): void {
   const groundY = Math.round(height * 0.34);
@@ -16,36 +17,48 @@ export function drawBedtime(ctx: CanvasRenderingContext2D, width: number, height
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, width, groundY);
 
-  for (let i = 0; i < 40; i++) {
-    const sx = random() * width;
-    const sy = random() * groundY * 0.9;
-    const twinkle = 0.5 + 0.5 * Math.sin(time * 2 + i);
-    ctx.fillStyle = `rgba(255, 244, 176, ${0.35 + 0.65 * twinkle})`;
-    ctx.beginPath();
-    ctx.arc(sx, sy, 1 + random() * 1.8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Crescent moon.
   const moonR = Math.min(width, height) * 0.06;
   const moonX = width * 0.84;
   const moonY = groundY * 0.72; // Below the "またあしたね" title on every screen.
+
+  for (let i = 0; i < 40; i++) {
+    const sx = random() * width;
+    const sy = random() * groundY * 0.9;
+    const r = 1 + random() * 1.8;
+    // None behind the moon, whose dark side would hide them.
+    if (Math.hypot(sx - moonX, sy - moonY) < moonR + r) continue;
+    const twinkle = 0.5 + 0.5 * Math.sin(time * 2 + i);
+    ctx.fillStyle = `rgba(255, 244, 176, ${0.35 + 0.65 * twinkle})`;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Crescent moon in a soft glow.
+  const haloR = moonR * 2.6;
+  const halo = ctx.createRadialGradient(moonX, moonY, moonR * 0.8, moonX, moonY, haloR);
+  halo.addColorStop(0, 'rgba(255, 244, 176, 0.3)');
+  halo.addColorStop(1, 'rgba(255, 244, 176, 0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(moonX - haloR, moonY - haloR, haloR * 2, haloR * 2);
+  // A bite clipped out of the full moon, so the glow shows through it.
+  const biteX = moonX + moonR * 0.45;
+  const biteY = moonY - moonR * 0.25;
+  const biteR = moonR * 0.9;
+  const bite = new Path2D();
+  bite.rect(0, 0, width, groundY);
+  bite.moveTo(biteX + biteR, biteY);
+  bite.arc(biteX, biteY, biteR, 0, Math.PI * 2);
+  ctx.save();
+  ctx.clip(bite, 'evenodd');
   ctx.fillStyle = '#fff4b0';
   ctx.beginPath();
   ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#1f2f5e';
-  ctx.beginPath();
-  ctx.arc(moonX + moonR * 0.45, moonY - moonR * 0.25, moonR * 0.9, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.restore();
 
-  const band = (height - groundY) / NIGHT_SOIL.length;
-  NIGHT_SOIL.forEach((color, i) => {
-    ctx.fillStyle = color;
-    ctx.fillRect(0, groundY + i * band, width, band + 1);
-  });
-  ctx.fillStyle = '#3f7d2c';
-  ctx.fillRect(0, groundY - 10, width, 14);
+  drawStrata(ctx, width, groundY, height, NIGHT_SOIL, random);
+  drawGrass(ctx, width, groundY, NIGHT_GRASS, random);
 
   // The burrow: a round room with a shaft up to the grass.
   const cx = width / 2;
@@ -54,21 +67,18 @@ export function drawBedtime(ctx: CanvasRenderingContext2D, width: number, height
   const ry = Math.min(rx * 0.46, (height - groundY) * 0.36);
   const room = new Path2D();
   room.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  const opening = groundY - 4;
+  const depth = ry * 0.16;
+  const burrow = new Path2D(room);
   const shaftX = cx - rx * 0.62;
-  const shaft = new Path2D();
-  shaft.rect(shaftX - ry * 0.32, groundY - 8, ry * 0.64, cy - groundY);
+  // The shaft starts above the opening by the depth of the ceiling's shadow, so the cut below leaves none of it.
+  burrow.rect(shaftX - ry * 0.32, opening - depth, ry * 0.64, cy - opening + depth);
   ctx.save();
   // Cut the shaft off at the grass so it opens as a hole rather than sticking up.
   ctx.beginPath();
-  ctx.rect(0, groundY - 4, width, height);
+  ctx.rect(0, opening, width, height);
   ctx.clip();
-  ctx.lineWidth = 16;
-  ctx.strokeStyle = '#3d2314';
-  ctx.stroke(room);
-  ctx.stroke(shaft);
-  ctx.fillStyle = '#c99c6c';
-  ctx.fill(room);
-  ctx.fill(shaft);
+  drawHollow(ctx, burrow, '#c99c6c', 8, depth);
   ctx.restore();
 
   // A warm lantern glow so the room feels cosy, not dark.

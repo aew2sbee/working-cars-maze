@@ -2,8 +2,22 @@
   --soil: #5b361f;
   --hat: #ffd23f;
   --ink: #3a2213;
+  /* Light from above: buttons lit at the top and shaded at the bottom, with a gleam along the inside top
+     and a soft shadow on the ground under them. */
+  --cream-gloss: linear-gradient(#fffaf0, #fff3cf 55%, #f6e1a6);
+  --night-gloss: linear-gradient(#4864a6, #30477f 55%, #24376a);
+  --gleam: inset 0 5px 0 rgba(255, 255, 255, 0.5);
+  --lift: 0 14px 16px rgba(30, 14, 4, 0.3);
+  /* Under the hard outline of big titles. */
+  --title-lift: 0 12px 14px rgba(30, 14, 4, 0.35);
   color-scheme: light;
   font-family: 'Hiragino Maru Gothic ProN', 'BIZ UDPGothic', 'Yu Gothic', system-ui, sans-serif;
+}
+
+/* The dark blue buttons gleam more softly. */
+.sleep,
+.one-more__sleep {
+  --gleam: inset 0 4px 0 rgba(255, 255, 255, 0.3);
 }
 
 html,
@@ -65,7 +79,8 @@ body {
     0 6px 0 var(--ink),
     4px 0 0 var(--ink),
     -4px 0 0 var(--ink),
-    0 -4px 0 var(--ink);
+    0 -4px 0 var(--ink),
+    var(--title-lift);
   animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
 
@@ -77,8 +92,8 @@ body {
   padding: 0 44px;
   border: 6px solid var(--ink);
   border-radius: 999px;
-  background: var(--hat);
-  box-shadow: 0 8px 0 var(--ink);
+  background: linear-gradient(#ffe680, var(--hat) 55%, #f5bf1c);
+  box-shadow: var(--gleam), 0 8px 0 var(--ink), var(--lift);
   color: var(--ink);
   font: inherit;
   font-size: clamp(28px, 6vw, 40px);
@@ -94,7 +109,7 @@ body {
 
 .again:active {
   transform: translateY(6px);
-  box-shadow: 0 2px 0 var(--ink);
+  box-shadow: var(--gleam), 0 2px 0 var(--ink);
 }
 
 .again:focus-visible {
@@ -107,8 +122,8 @@ body {
   padding: 0 32px;
   border: 5px solid var(--ink);
   border-radius: 999px;
-  background: #fff3cf;
-  box-shadow: 0 6px 0 var(--ink);
+  background: var(--cream-gloss);
+  box-shadow: var(--gleam), 0 6px 0 var(--ink), var(--lift);
   color: var(--ink);
   font: inherit;
   font-size: clamp(22px, 4.5vw, 30px);
@@ -119,7 +134,7 @@ body {
 
 .change:active {
   transform: translateY(5px);
-  box-shadow: 0 1px 0 var(--ink);
+  box-shadow: var(--gleam), 0 1px 0 var(--ink);
 }
 
 .change:focus-visible {
@@ -139,8 +154,8 @@ body {
   padding: 0 18px 0 12px;
   border: 4px solid var(--ink);
   border-radius: 999px;
-  background: #30477f;
-  box-shadow: 0 4px 0 var(--ink);
+  background: var(--night-gloss);
+  box-shadow: var(--gleam), 0 4px 0 var(--ink);
   color: #fff4b0;
   font: inherit;
   font-size: clamp(15px, 2.8vh, 22px);
@@ -161,7 +176,7 @@ body {
 
 .sleep:active {
   transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ink);
+  box-shadow: var(--gleam), 0 1px 0 var(--ink);
 }
 
 .sleep:focus-visible {
@@ -180,15 +195,22 @@ body {
   gap: clamp(8px, 2vh, 20px);
   padding: calc(env(safe-area-inset-top) + 16px) calc(env(safe-area-inset-right) + 16px)
     calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px);
-  background: linear-gradient(
-    #6fc3ea 0,
-    #c4ebf7 22%,
-    #5aa83a 22%,
-    #5aa83a 24%,
-    #8a5a36 24%,
-    #7a4d2d 55%,
-    #5b361f 100%
-  );
+  background:
+    /* The grass's shadow on the soil, over sky, lit grass and soil in layers. */
+    linear-gradient(transparent 24%, rgba(30, 14, 4, 0.35) 24%, transparent 27%),
+    linear-gradient(
+      #6fc3ea 0,
+      #c4ebf7 22%,
+      #7cc95a 22%,
+      #5aa83a 23%,
+      #4a9230 24%,
+      #8e5e39 24%,
+      #74492a 47%,
+      #8a5a36 47%,
+      #66401f 72%,
+      #7a4d2d 72%,
+      var(--soil) 100%
+    );
   overflow: auto;
 }
 
@@ -206,7 +228,8 @@ body {
     0 5px 0 var(--ink),
     3px 0 0 var(--ink),
     -3px 0 0 var(--ink),
-    0 -3px 0 var(--ink);
+    0 -3px 0 var(--ink),
+    var(--title-lift);
 }
 
 .select__prompt {
@@ -238,8 +261,8 @@ body {
   padding: 10px 8px 14px;
   border: 5px solid var(--ink);
   border-radius: 28px;
-  background: #fff3cf;
-  box-shadow: 0 7px 0 var(--ink);
+  background: var(--cream-gloss);
+  box-shadow: var(--gleam), 0 7px 0 var(--ink), var(--lift);
   color: var(--ink);
   font: inherit;
   font-size: clamp(17px, 3.6vw, 24px);
@@ -255,7 +278,7 @@ body {
 
 .vehicle:active {
   transform: translateY(6px);
-  box-shadow: 0 1px 0 var(--ink);
+  box-shadow: var(--gleam), 0 1px 0 var(--ink);
 }
 
 .vehicle:focus-visible {
@@ -292,7 +315,7 @@ body {
   border: 6px solid var(--ink);
   border-radius: 32px;
   background: #fff3cf;
-  box-shadow: 0 8px 0 var(--ink);
+  box-shadow: 0 8px 0 var(--ink), var(--lift);
   color: var(--ink);
   animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
@@ -331,8 +354,8 @@ body {
   min-height: 96px;
   border: 6px solid var(--ink);
   border-radius: 999px;
-  background: #30477f;
-  box-shadow: 0 8px 0 var(--ink);
+  background: var(--night-gloss);
+  box-shadow: var(--gleam), 0 8px 0 var(--ink), var(--lift);
   color: #fff4b0;
   font: inherit;
   font-size: clamp(28px, 6vw, 40px);
@@ -349,7 +372,7 @@ body {
 
 .one-more__sleep:active {
   transform: translateY(6px);
-  box-shadow: 0 2px 0 var(--ink);
+  box-shadow: var(--gleam), 0 2px 0 var(--ink);
 }
 
 .one-more__sleep:focus-visible {
@@ -413,7 +436,8 @@ body {
     0 5px 0 var(--ink),
     3px 0 0 var(--ink),
     -3px 0 0 var(--ink),
-    0 -3px 0 var(--ink);
+    0 -3px 0 var(--ink),
+    var(--title-lift);
 }
 
 /* Quiet on purpose, so it does not invite a child to press it. */
