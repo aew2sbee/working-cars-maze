@@ -2,6 +2,7 @@
 // Drawn facing right in a 100 x 100 box centred on (0, 0); flipped to face left.
 
 import { drawStar, HAT, INK } from './draw';
+import { ballGradient, drawShadow, fillBall, litGradient, strokeGleam, strokeStreak, tint } from './shade';
 
 export type VehicleId = 'crane' | 'excavator' | 'bulldozer' | 'dump';
 
@@ -17,6 +18,8 @@ const STEEL = '#6a6a6a';
 const RUBBER = '#3b3b3b';
 const FUR = '#6d4c3d';
 const PINK = '#f29bb0';
+const HUB = '#9a9a9a';
+const PILLOW = '#fff8e6';
 
 export function drawVehicle(
   ctx: CanvasRenderingContext2D,
@@ -32,8 +35,11 @@ export function drawVehicle(
 ): void {
   const u = size / 100;
   ctx.save();
-  ctx.translate(x, y + bob);
+  ctx.translate(x, y);
   ctx.scale(facing * u, u);
+  // The shadow stays on the ground while the vehicle bobs above it.
+  drawShadow(ctx, -2, 37, 50, 6);
+  ctx.translate(0, bob / u);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.strokeStyle = INK;
@@ -112,7 +118,7 @@ function drawBulldozer(ctx: CanvasRenderingContext2D, driver: boolean, ouch: num
     [10, 6],
     [40, 14],
   ]);
-  ctx.fillStyle = BODY;
+  ctx.fillStyle = litGradient(ctx, BODY, -14, 36);
   ctx.beginPath();
   ctx.moveTo(38, -14);
   ctx.lineTo(54, -14);
@@ -121,8 +127,12 @@ function drawBulldozer(ctx: CanvasRenderingContext2D, driver: boolean, ouch: num
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(42, -9);
+  ctx.lineTo(42, 24);
+  strokeGleam(ctx, 3);
   // Steel cutting edge.
-  ctx.fillStyle = STEEL;
+  ctx.fillStyle = litGradient(ctx, STEEL, 30, 36, 0.4);
   ctx.beginPath();
   ctx.moveTo(38, 30);
   ctx.lineTo(54, 30);
@@ -143,12 +153,12 @@ function drawBulldozer(ctx: CanvasRenderingContext2D, driver: boolean, ouch: num
 
 function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean, ouch: number): void {
   // Chassis.
-  ctx.fillStyle = RUBBER;
+  ctx.fillStyle = litGradient(ctx, RUBBER, 10, 20);
   ctx.beginPath();
   ctx.roundRect(-44, 10, 86, 10, 4);
   ctx.fill();
   // Tipping bed at the back.
-  ctx.fillStyle = BODY;
+  ctx.fillStyle = litGradient(ctx, BODY, -18, 10);
   ctx.beginPath();
   ctx.moveTo(-48, -18);
   ctx.lineTo(4, -18);
@@ -157,8 +167,12 @@ function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean, ouch: num
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-41, -13);
+  ctx.lineTo(-4, -13);
+  strokeGleam(ctx, 3);
   // A heap of soil in the bed.
-  ctx.fillStyle = '#8a5a36';
+  ctx.fillStyle = litGradient(ctx, '#8a5a36', -27, -18, 0.25);
   ctx.beginPath();
   ctx.moveTo(-44, -18);
   ctx.quadraticCurveTo(-22, -36, 0, -18);
@@ -166,7 +180,7 @@ function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean, ouch: num
   ctx.fill();
   ctx.stroke();
   // Open-top cab, so the mole is as easy to see as on the other vehicles.
-  ctx.fillStyle = BODY;
+  ctx.fillStyle = litGradient(ctx, BODY, -10, 10);
   ctx.beginPath();
   ctx.moveTo(8, 10);
   ctx.lineTo(8, -10);
@@ -176,6 +190,10 @@ function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean, ouch: num
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(12.5, -5);
+  ctx.lineTo(12.5, 4);
+  strokeGleam(ctx, 3);
   if (driver) drawMole(ctx, 22, -20, ouch);
   if (driver) drawPaws(ctx, [28, 38], -9);
   // Windshield frame in front of the mole.
@@ -186,27 +204,18 @@ function drawDumpTruck(ctx: CanvasRenderingContext2D, driver: boolean, ouch: num
   ctx.stroke();
   ctx.lineWidth = 3;
   for (const wheel of [-28, -10, 26]) {
-    ctx.fillStyle = RUBBER;
-    ctx.beginPath();
-    ctx.arc(wheel, 24, 11, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#9a9a9a';
-    ctx.beginPath();
-    ctx.arc(wheel, 24, 4.5, 0, Math.PI * 2);
-    ctx.fill();
+    fillBall(ctx, wheel, 24, 11, RUBBER, 0.3);
+    fillBall(ctx, wheel, 24, 4.5, HUB);
   }
 }
 
 function drawCrawler(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = RUBBER;
+  ctx.fillStyle = litGradient(ctx, RUBBER, 12, 36);
   ctx.beginPath();
   ctx.roundRect(-42, 12, 80, 24, 12);
   ctx.fill();
   for (const wheel of [-29, -4, 21]) {
-    ctx.fillStyle = '#9a9a9a';
-    ctx.beginPath();
-    ctx.arc(wheel, 24, 7.5, 0, Math.PI * 2);
-    ctx.fill();
+    fillBall(ctx, wheel, 24, 7.5, HUB);
     ctx.fillStyle = RUBBER;
     ctx.beginPath();
     ctx.arc(wheel, 24, 3, 0, Math.PI * 2);
@@ -216,7 +225,7 @@ function drawCrawler(ctx: CanvasRenderingContext2D): void {
 
 /** Machine body with a hazard stripe along the bottom. */
 function drawBody(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
-  ctx.fillStyle = BODY;
+  ctx.fillStyle = litGradient(ctx, BODY, y, y + height);
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, 6);
   ctx.fill();
@@ -238,24 +247,31 @@ function drawBody(ctx: CanvasRenderingContext2D, x: number, y: number, width: nu
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, 6);
   ctx.stroke();
+  // Light round the back corner, clear of the driver's head.
+  ctx.beginPath();
+  ctx.moveTo(x + 5, y + height - 10);
+  ctx.lineTo(x + 5, y + 8);
+  ctx.quadraticCurveTo(x + 5, y + 5, x + 9, y + 5);
+  strokeGleam(ctx, 3);
 }
 
-/** A thick two-tone arm through the given joints. */
+/** A thick two-tone arm through the given joints, with a lighter streak along the top so it looks round. */
 function drawArm(ctx: CanvasRenderingContext2D, joints: [number, number][]): void {
-  ctx.beginPath();
-  joints.forEach(([jx, jy], i) => (i === 0 ? ctx.moveTo(jx, jy) : ctx.lineTo(jx, jy)));
+  const arm = new Path2D();
+  joints.forEach(([jx, jy], i) => (i === 0 ? arm.moveTo(jx, jy) : arm.lineTo(jx, jy)));
   ctx.lineWidth = 15;
   ctx.strokeStyle = INK;
-  ctx.stroke();
+  ctx.stroke(arm);
   ctx.lineWidth = 9;
   ctx.strokeStyle = BODY;
-  ctx.stroke();
+  ctx.stroke(arm);
+  strokeStreak(ctx, arm, tint(BODY, 0.5), 3, 0, -2);
   ctx.strokeStyle = INK;
   ctx.lineWidth = 3;
 }
 
 function drawBucket(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = STEEL;
+  ctx.fillStyle = litGradient(ctx, STEEL, -8, 10, 0.4);
   ctx.beginPath();
   ctx.moveTo(38, -8);
   ctx.lineTo(56, -8);
@@ -266,6 +282,10 @@ function drawBucket(ctx: CanvasRenderingContext2D): void {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(41, -4.5);
+  ctx.lineTo(52, -4.5);
+  strokeGleam(ctx, 2.5);
 }
 
 /** The mole's head in a hard hat, centred on (hx, hy). With `ouch` above 0 it has just bumped a wall. */
@@ -277,16 +297,9 @@ function drawMole(ctx: CanvasRenderingContext2D, hx: number, hy: number, ouch: n
   ctx.strokeStyle = INK;
   ctx.lineWidth = 3;
 
-  ctx.fillStyle = FUR;
-  ctx.beginPath();
-  ctx.arc(0, 0, 17, 0, Math.PI * 2);
-  ctx.fill();
+  fillBall(ctx, 0, 0, 17, FUR);
   ctx.stroke();
-  ctx.fillStyle = PINK;
-  ctx.beginPath();
-  ctx.arc(18, 3, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  drawNose(ctx, 18, 3);
   ctx.fillStyle = 'rgba(242, 155, 176, 0.6)';
   ctx.beginPath();
   ctx.arc(5, 7, 3.5, 0, Math.PI * 2);
@@ -312,17 +325,7 @@ function drawMole(ctx: CanvasRenderingContext2D, hx: number, hy: number, ouch: n
   ctx.translate(0, -8 - hop * 9);
   ctx.rotate(-hop * 0.3);
   ctx.translate(0, 8);
-  ctx.fillStyle = HAT;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(0, -8, 15, Math.PI, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.roundRect(-19, -11, 38, 6, 3);
-  ctx.fill();
-  ctx.stroke();
+  drawHardHat(ctx, 0, -8, 15);
   ctx.restore();
 
   if (ouch > 0) {
@@ -363,21 +366,22 @@ export function drawSleepingMole(ctx: CanvasRenderingContext2D, x: number, y: nu
   ctx.lineCap = 'round';
   ctx.strokeStyle = INK;
   ctx.lineWidth = 3;
+  drawShadow(ctx, 14, 33, 68, 5);
 
-  ctx.fillStyle = '#fff8e6';
+  ctx.fillStyle = litGradient(ctx, PILLOW, 16, 32, 0.15);
   ctx.beginPath();
   ctx.ellipse(-30, 24, 22, 8, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = FUR;
+  ctx.fillStyle = litGradient(ctx, FUR, -4, 32);
   ctx.beginPath();
   ctx.ellipse(6, 14, 34, 18, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
   // Blanket over the body.
-  ctx.fillStyle = '#7bb6e8';
+  ctx.fillStyle = litGradient(ctx, '#7bb6e8', 0, 32);
   ctx.beginPath();
   ctx.moveTo(-14, 32);
   ctx.quadraticCurveTo(-16, 2, 10, 0);
@@ -385,7 +389,7 @@ export function drawSleepingMole(ctx: CanvasRenderingContext2D, x: number, y: nu
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.strokeStyle = '#fff8e6';
+  ctx.strokeStyle = PILLOW;
   ctx.lineWidth = 3;
   for (const stripe of [4, 20]) {
     ctx.beginPath();
@@ -393,18 +397,15 @@ export function drawSleepingMole(ctx: CanvasRenderingContext2D, x: number, y: nu
     ctx.lineTo(stripe + 4, 30);
     ctx.stroke();
   }
+  ctx.beginPath();
+  ctx.moveTo(12, 4.5);
+  ctx.quadraticCurveTo(26, 5.5, 32, 12.5);
+  strokeGleam(ctx, 3, 0.5);
   ctx.strokeStyle = INK;
 
-  ctx.fillStyle = FUR;
-  ctx.beginPath();
-  ctx.arc(-30, 6, 17, 0, Math.PI * 2);
-  ctx.fill();
+  fillBall(ctx, -30, 6, 17, FUR);
   ctx.stroke();
-  ctx.fillStyle = PINK;
-  ctx.beginPath();
-  ctx.arc(-48, 9, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  drawNose(ctx, -48, 9);
   // Closed, sleepy eye.
   ctx.lineWidth = 2.5;
   ctx.beginPath();
@@ -417,19 +418,38 @@ export function drawSleepingMole(ctx: CanvasRenderingContext2D, x: number, y: nu
   ctx.fill();
 
   // Hard hat resting on the floor.
-  ctx.fillStyle = HAT;
+  drawHardHat(ctx, 64, 30, 14);
+
+  ctx.restore();
+}
+
+/** A hard hat with its dome centred on (x, y) and the brim across its base. */
+function drawHardHat(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  ctx.fillStyle = ballGradient(ctx, x, y, r, HAT);
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(64, 30, 14, Math.PI, 0);
+  ctx.arc(x, y, r, Math.PI, 0);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
   ctx.beginPath();
-  ctx.roundRect(46, 27, 36, 6, 3);
+  ctx.arc(x, y, r * 0.7, Math.PI * 1.15, Math.PI * 1.4);
+  strokeGleam(ctx, 3);
+  ctx.fillStyle = litGradient(ctx, HAT, y - 3, y + 3);
+  ctx.beginPath();
+  ctx.roundRect(x - r - 4, y - 3, r * 2 + 8, 6, 3);
   ctx.fill();
   ctx.stroke();
+}
 
-  ctx.restore();
+/** The mole's pink nose, shiny on top. */
+function drawNose(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  fillBall(ctx, x, y, 6, PINK);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+  ctx.beginPath();
+  ctx.arc(x - 1.8, y - 2, 1.6, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 /** Front paws resting on the controls. */

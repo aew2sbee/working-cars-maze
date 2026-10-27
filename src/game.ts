@@ -417,7 +417,7 @@ export function startGame({
       if (done && sameCell(cell, current)) continue;
       const chest = cellCenter(layout, cell);
       if (!open) drawTwinkles(ctx, chest.x, chest.y, chestSize, time);
-      drawChest(ctx, chest.x, chest.y, chestSize, open);
+      drawChest(ctx, chest.x, chest.y, chestSize, open, true);
     }
 
     const driver = cellCenter(layout, position);
@@ -526,9 +526,9 @@ export function startGame({
 
   function drawTiredMole(): void {
     const { pictureCtx, width, height } = fitPicture(oneMore.picture);
-    // The mole and its hat span about -54..82 across and -14..34 down, in hundredths of its size.
-    const size = Math.min(width / 1.45, height / 0.55);
-    drawSleepingMole(pictureCtx, width / 2 - size * 0.14, height / 2 - size * 0.1, size);
+    // The mole, its hat and its shadow span about -54..82 across and -14..38 down, in hundredths of its size.
+    const size = Math.min(width / 1.45, height / 0.59);
+    drawSleepingMole(pictureCtx, width / 2 - size * 0.14, height / 2 - size * 0.12, size);
   }
 
   // Each handler acts only while asking, so a quick double tap does not run it twice.
